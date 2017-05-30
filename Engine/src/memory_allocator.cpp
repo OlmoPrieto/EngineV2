@@ -1,15 +1,19 @@
 #include <iostream>
+#include <iterator>
 #include <list>
 
 typedef unsigned char byte;
+typedef unsigned int uint64;
 
 class Allocator {
 public:
   class Block {
   public:
-    Block(byte* pAddress, std::size_t uSize) {
+    Block(byte* pAddress, std::size_t uSize, uint64 uId = 65536, Block* pNextFreeBlock = nullptr) {
       m_pAddress = pAddress;
+      m_pNextFreeBlock = pNextFreeBlock;
       m_uSize = uSize;
+      m_uId = uId;
       m_bFree = false;
     }
 
@@ -30,7 +34,7 @@ public:
     }
 
     void print() const {
-      printf("Block address: %p\n", m_pAddress);
+      printf("Block address: %p\tid: %u\n", m_pAddress, m_uId);
     }
 
     void resize(std::size_t uNewSize, byte* pNewAddress = nullptr) {
@@ -44,47 +48,73 @@ public:
       m_pAddress = pNewAddress;
     }
 
+    // Public variables
+    Block* m_pNextFreeBlock;
+
   private:
     byte* m_pAddress;
     std::size_t m_uSize;
+    uint64 m_uId;
     bool m_bFree;
   };
 
   Allocator() {
-    byte* pMemStart = (byte*)malloc(2000000);  // 2MB
-    if (pMemStart != nullptr) {
-      Block cBlock(pMemStart, 2000000);
-      m_lBlocks.push_back(cBlock);
-      //m_lBlocks.emplace_back(Block(pMemStart, 2000000));
+    m_pMemStart = (byte*)malloc(2000000);  // 2MB
+    if (m_pMemStart != nullptr) {
+      //printf("id: %d\n", sm_uBlockCount);
+      m_lBlocks.emplace_back(Block(m_pMemStart, 2000000, sm_uBlockCount));
+      sm_uBlockCount++;
+      m_pBigFreeBlock = &m_lBlocks.front();
+      m_pFirstFreeBlock = &m_lBlocks.front();
+      m_lBlocks.front().m_pNextFreeBlock = m_pBigFreeBlock;
     } 
     else {
+      m_pMemStart = nullptr;
       printf("ERROR: Not enough memory!\nW: Allocator");
     }
   }
 
   ~Allocator() {
-
+    if (m_pMemStart != nullptr) {
+      free(m_pMemStart);
+    }
   }
 
   byte* requestBlock(std::size_t uRequestedSize) {
-    Block cBlock = m_lBlocks.front();
 
-    // TODO: checks checks checks
-    byte* pNewBlockAddress = (byte*)(cBlock.address());
-    m_lBlocks.front().resize(cBlock.size() - uRequestedSize, 
-      (byte*)(cBlock.address()) + uRequestedSize);
-    
-    //const byte* pConstAddress = m_lBlocks.front().address();
-    //byte* pNextAddress = (byte*)(pConstAddress) + uRequestedSize;
-    //printf("Old: %p\nNew: %p\n", pConstAddress, pNextAddress);
+    // This will keep giving blocks until the big block isn't enough
+    // TODO: manage freed blocks -> split them as needed 
+    //    -> check if prev/next block is free and join them
+    if (m_pFirstFreeBlock->size() >= uRequestedSize) {
+      byte* pNewBlockAddress = (byte*)(m_pFirstFreeBlock->address());
 
-    Block cNewBlock(pNewBlockAddress, uRequestedSize);
-    m_lBlocks.push_back(cNewBlock);
+      m_pFirstFreeBlock->resize(m_pFirstFreeBlock->size() - uRequestedSize, 
+        (byte*)(m_pFirstFreeBlock->address()) + uRequestedSize);
+
+      m_lBlocks.emplace_back(Block(pNewBlockAddress, uRequestedSize, sm_uBlockCount));
+      sm_uBlockCount++;
+
+      return pNewBlockAddress;
+    }
+
+    return nullptr;
+
+  }
+
+  void releaseBlock(uint64 uId) {
+    // set next free block to the next free block in the list
+  }
+
+  //  Engine should call this time by time 
+  // to determine if the big block has no more free memory
+  // and to find the first released block. Then is when the party start
+  void findFirstFreeBlock() {
+
   }
 
   const Allocator::Block& getBlock(short shIndex) {
     short shTmp = 0;
-    for (std::list<Allocator::Block>::iterator it = m_lBlocks.begin();
+    for (std::list<Allocator::Block>::const_iterator it = m_lBlocks.begin();
       it != m_lBlocks.end(); it++) {
       if (shTmp == shIndex) {
         return *it;
@@ -93,17 +123,47 @@ public:
         shTmp++;
       }
     }
+    //std::list<Allocator::Block>::iterator it = m_lBlocks.begin();
+    //std::advance(it, 0);
+    //return *it;
   }
 
   const std::list<Allocator::Block>& getBlocks() const {
     return m_lBlocks;
   }
 
+  static uint64 getBlockCount() {
+    return sm_uBlockCount;
+  }
+
 private:
+  static uint64 sm_uBlockCount;
+
   std::list<Block> m_lBlocks;
+  Block* m_pBigFreeBlock;
+  Block* m_pFirstFreeBlock;
+  byte* m_pMemStart;
 };
 
+uint64 Allocator::sm_uBlockCount = 0;
 Allocator cAlloc;
+
+template <class T>
+class sptr {
+public:
+  sptr() {
+    printf("T Class size: %d\n", sizeof(T));
+
+    m_pPtr = new (cAlloc.requestBlock(sizeof(T))) T();
+  }
+
+  ~sptr() {
+
+  }
+
+private:
+  T* m_pPtr;
+};
 
 class Foo {
 public:
@@ -119,8 +179,12 @@ public:
     iZ = z;
   }
 
-  void* operator new(std::size_t uSize) {
+  void print() const {
+    printf("x: %d\ty: %d\tz: %d\n", iX, iY, iZ);
+  }
 
+  void fooing() {
+    iY = 123123;
   }
 
   int iX;
@@ -132,30 +196,38 @@ int main() {
   printf("\n=======================\n");
   printf("\nmain()\n\n");
   printf("Stats: \n"),
-  printf("sizeof int\t: %d\n", sizeof(int));
-  printf("sizeof float\t: %d\n", sizeof(float));
-  printf("sizeof double\t: %d\n", sizeof(double));
-  printf("sizeof byte*\t: %d\n", sizeof(byte*));
+  printf("sizeof int\t: %d bytes\n", sizeof(int));
+  printf("sizeof float\t: %d bytes\n", sizeof(float));
+  printf("sizeof double\t: %d bytes\n", sizeof(double));
+  printf("sizeof byte*\t: %d bytes\n", sizeof(byte*));
   printf("=======================\n");
 
-  cAlloc = Allocator();
   printf("Created allocator\n");
+
   const std::list<Allocator::Block> pBlocks = cAlloc.getBlocks();
-  //printf("Address: %p\n", pBlocks.front().address());
+
   printf("First block address: ");
   pBlocks.front().print();
 
   printf("\nRequesting block...\n");
-  cAlloc.requestBlock(4);
-  //const Allocator::Block cBlock1 = cAlloc.getBlock(1);
-  //cBlock1.print();
+  cAlloc.requestBlock(32);
+
   printf("First block address (big free block): ");
   cAlloc.getBlock(0).print();
   printf("Second block address: ");
   cAlloc.getBlock(1).print();
 
-  Foo foo1;
-  printf("sizeof Foo = %d\n", sizeof(foo1));
+  printf("\nRequesting block...\n");
+  cAlloc.requestBlock(4);
+  printf("First block address (big free block): ");
+  cAlloc.getBlock(0).print();
+  printf("Second block address: ");
+  cAlloc.getBlock(1).print();
+  printf("Third block address: ");
+  cAlloc.getBlock(2).print();
+
+
+  //sptr<Foo> foo1;
 
   return 0;
 }
