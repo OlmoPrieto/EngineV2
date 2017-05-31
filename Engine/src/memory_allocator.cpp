@@ -67,6 +67,8 @@ public:
       m_pBigFreeBlock = &m_lBlocks.front();
       m_pFirstFreeBlock = &m_lBlocks.front();
       m_lBlocks.front().m_pNextFreeBlock = m_pBigFreeBlock;
+
+      m_uUsedMemory = 0;
     } 
     else {
       m_pMemStart = nullptr;
@@ -82,6 +84,10 @@ public:
 
   byte* requestBlock(std::size_t uRequestedSize) {
 
+    if (m_pBigFreeBlock->size() >= uRequestedSize) {
+      m_pFirstFreeBlock = m_pBigFreeBlock;
+    }
+
     // This will keep giving blocks until the big block isn't enough
     // TODO: manage freed blocks -> split them as needed 
     //    -> check if prev/next block is free and join them
@@ -94,6 +100,8 @@ public:
       m_lBlocks.emplace_back(Block(pNewBlockAddress, uRequestedSize, sm_uBlockCount));
       sm_uBlockCount++;
 
+      m_uUsedMemory += uRequestedSize;
+
       return pNewBlockAddress;
     }
 
@@ -101,7 +109,7 @@ public:
 
   }
 
-  void releaseBlock(uint64 uId) {
+  void releaseBlock(byte* pAddress) {
     // set next free block to the next free block in the list
   }
 
@@ -132,6 +140,14 @@ public:
     return m_lBlocks;
   }
 
+  uint64 getUsedMemory() const {
+    return m_uUsedMemory;
+  }
+
+  void printUsedMemory() const {
+    printf("\nUsed memory: %d bytes\n", m_uUsedMemory);
+  }
+
   static uint64 getBlockCount() {
     return sm_uBlockCount;
   }
@@ -142,23 +158,35 @@ private:
   std::list<Block> m_lBlocks;
   Block* m_pBigFreeBlock;
   Block* m_pFirstFreeBlock;
+  uint64 m_uUsedMemory;
   byte* m_pMemStart;
 };
 
 uint64 Allocator::sm_uBlockCount = 0;
 Allocator cAlloc;
 
+// [ Managed Pointer ]
 template <class T>
-class sptr {
+class mptr {
 public:
-  sptr() {
+  mptr() {
     printf("T Class size: %d\n", sizeof(T));
 
     m_pPtr = new (cAlloc.requestBlock(sizeof(T))) T();
   }
 
-  ~sptr() {
+  T* get() const {
+    return m_pPtr;
+  }
 
+  T* operator ->() const {
+    return m_pPtr;
+  }
+
+  ~mptr() {
+    m_pPtr->~T();
+
+    cAlloc.releaseBlock((byte*)m_pPtr);
   }
 
 private:
@@ -226,8 +254,13 @@ int main() {
   printf("Third block address: ");
   cAlloc.getBlock(2).print();
 
-
-  //sptr<Foo> foo1;
+  //printf("Used memory: %d bytes\n", cAlloc.getUsedMemory());
+  cAlloc.printUsedMemory();
+  printf("Creating Foo...\n");
+  mptr<Foo> foo1;
+  foo1->print();
+  //printf("Used memory: %d bytes\n", cAlloc.getUsedMemory());
+  cAlloc.printUsedMemory();
 
   return 0;
 }
