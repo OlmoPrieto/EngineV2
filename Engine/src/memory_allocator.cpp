@@ -21,15 +21,19 @@ public:
 
     }
 
-    const byte* address() const {
+    void setNextFreeBlock(Block* pNextFreeBlock) {
+      m_pNextFreeBlock = pNextFreeBlock;
+    }
+
+    const byte* getAddress() const {
       return m_pAddress;
     }
 
-    std::size_t size() const {
+    std::size_t getSize() const {
       return m_uSize;
     }
 
-    bool free() const {
+    bool isFree() const {
       return m_bFree;
     }
 
@@ -48,6 +52,10 @@ public:
       m_pAddress = pNewAddress;
     }
 
+    void release() {
+      m_bFree = false;
+    }
+
     // Public variables
     Block* m_pNextFreeBlock;
 
@@ -63,7 +71,7 @@ public:
     if (m_pMemStart != nullptr) {
       //printf("id: %d\n", sm_uBlockCount);
       m_lBlocks.emplace_back(Block(m_pMemStart, 2000000, sm_uBlockCount));
-      sm_uBlockCount++;
+      ++sm_uBlockCount;
       m_pBigFreeBlock = &m_lBlocks.front();
       m_pFirstFreeBlock = &m_lBlocks.front();
       m_lBlocks.front().m_pNextFreeBlock = m_pBigFreeBlock;
@@ -84,21 +92,21 @@ public:
 
   byte* requestBlock(std::size_t uRequestedSize) {
 
-    if (m_pBigFreeBlock->size() >= uRequestedSize) {
+    if (m_pBigFreeBlock->getSize() >= uRequestedSize) {
       m_pFirstFreeBlock = m_pBigFreeBlock;
     }
 
     // This will keep giving blocks until the big block isn't enough
     // TODO: manage freed blocks -> split them as needed 
     //    -> check if prev/next block is free and join them
-    if (m_pFirstFreeBlock->size() >= uRequestedSize) {
-      byte* pNewBlockAddress = (byte*)(m_pFirstFreeBlock->address());
+    if (m_pFirstFreeBlock->getSize() >= uRequestedSize) {
+      byte* pNewBlockAddress = (byte*)(m_pFirstFreeBlock->getAddress());
 
-      m_pFirstFreeBlock->resize(m_pFirstFreeBlock->size() - uRequestedSize, 
-        (byte*)(m_pFirstFreeBlock->address()) + uRequestedSize);
+      m_pFirstFreeBlock->resize(m_pFirstFreeBlock->getSize() - uRequestedSize, 
+        (byte*)(m_pFirstFreeBlock->getAddress()) + uRequestedSize);
 
       m_lBlocks.emplace_back(Block(pNewBlockAddress, uRequestedSize, sm_uBlockCount));
-      sm_uBlockCount++;
+      ++sm_uBlockCount;
 
       m_uUsedMemory += uRequestedSize;
 
@@ -109,26 +117,72 @@ public:
 
   }
 
+  // TODO: implement a version of everything with a std::vector and compare performance
   void releaseBlock(byte* pAddress) {
     // set next free block to the next free block in the list
+    auto it = m_lBlocks.begin();
+    while (it != m_lBlocks.end()) {
+      if (pAddress == it->getAddress()) {
+        it->release();
+
+        coalesceBlocks(&it);
+
+        break;
+      }
+      else {
+        ++it;
+      }
+    }
+  }
+
+  // @return true if could coalesce at least one block
+  bool coalesceBlocks(std::list<Allocator::Block>::iterator* pIt = nullptr) {
+    bool bReturn = false;
+
+    if (pIt != nullptr) { // if an iterator is supplied, try to coalesce prev and/or next block
+      // check if previous block is free
+      if (*pIt != m_lBlocks.begin()) {
+        --(*pIt); 
+        if ((*pIt)->isFree() == true) {
+          (*pIt)->setNextFreeBlock(&(*(*pIt)));
+          bReturn = true;
+        }
+      }
+
+      // check if next block is free
+      ++(*pIt);
+      ++(*pIt);
+      if (*pIt != m_lBlocks.end()) {
+        if ((*pIt)->isFree() == true) {
+          (*pIt)->setNextFreeBlock(&(*(*pIt))); 
+          bReturn = true;
+        }
+      }
+    }
+    else {  // if no iterator is supplied, coalesce all blocks in the Allocator
+      bReturn = false;
+    }
+
+    return bReturn;
   }
 
   //  Engine should call this time by time 
   // to determine if the big block has no more free memory
   // and to find the first released block. Then is when the party start
-  void findFirstFreeBlock() {
+  Block* findFirstFreeBlock() {
 
+    return nullptr;
   }
 
   const Allocator::Block& getBlock(short shIndex) {
     short shTmp = 0;
     for (std::list<Allocator::Block>::const_iterator it = m_lBlocks.begin();
-      it != m_lBlocks.end(); it++) {
+      it != m_lBlocks.end(); ++it) {
       if (shTmp == shIndex) {
         return *it;
       }
       else {
-        shTmp++;
+        ++shTmp;
       }
     }
     //std::list<Allocator::Block>::iterator it = m_lBlocks.begin();
