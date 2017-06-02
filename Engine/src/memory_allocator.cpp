@@ -135,26 +135,42 @@ public:
     }
   }
 
+  // TODO: test all cases;
+  // release one sole block, 
+  // release one block with another free forward, 
+  // release one block with another free backward,
+  // release one block with free blocks backward and forward
+  //
   // @return true if could coalesce at least one block
   bool coalesceBlocks(std::list<Allocator::Block>::iterator* pIt = nullptr) {
+    printf("Coalescing!\n");
     bool bReturn = false;
+    bool bCoalescePrevBlock = false;
 
     if (pIt != nullptr) { // if an iterator is supplied, try to coalesce prev and/or next block
       // check if previous block is free
       if (*pIt != m_lBlocks.begin()) {
         --(*pIt); 
         if ((*pIt)->isFree() == true) {
-          (*pIt)->setNextFreeBlock(&(*(*pIt)));
+          //(*pIt)->setNextFreeBlock(&(*(*pIt)));
+          (*pIt)->resize((*pIt)->getSize() + (++(*pIt))->getSize());
+          m_lBlocks.erase(*pIt);  // delete current block
           bReturn = true;
+          bCoalescePrevBlock = true;
         }
       }
 
       // check if next block is free
-      ++(*pIt);
-      ++(*pIt);
+      if (bCoalescePrevBlock == false) {
+        ++(*pIt);
+      } 
+      ++(*pIt); // if the block was coalesced, ++(*pIt) will be the next block to the current
       if (*pIt != m_lBlocks.end()) {
         if ((*pIt)->isFree() == true) {
-          (*pIt)->setNextFreeBlock(&(*(*pIt))); 
+          //(*pIt)->setNextFreeBlock(&(*(*pIt)));
+          --(*pIt);
+          (*pIt)->resize((*pIt)->getSize() + (++(*pIt))->getSize());
+          m_lBlocks.erase((*pIt));
           bReturn = true;
         }
       }
@@ -174,7 +190,7 @@ public:
     return nullptr;
   }
 
-  const Allocator::Block& getBlock(short shIndex) {
+   const Allocator::Block& getBlock(short shIndex) {
     short shTmp = 0;
     for (std::list<Allocator::Block>::const_iterator it = m_lBlocks.begin();
       it != m_lBlocks.end(); ++it) {
@@ -198,8 +214,16 @@ public:
     return m_uUsedMemory;
   }
 
+  uint64 getNumElements() const {
+    return m_lBlocks.size();
+  }
+
   void printUsedMemory() const {
     printf("\nUsed memory: %d bytes\n", m_uUsedMemory);
+  }
+
+  void printNumElements() const {
+    printf("\nNumber of elements: %u\n", getNumElements());
   }
 
   static uint64 getBlockCount() {
@@ -308,12 +332,17 @@ int main() {
   printf("Third block address: ");
   cAlloc.getBlock(2).print();
 
-  //printf("Used memory: %d bytes\n", cAlloc.getUsedMemory());
+  printf("Releasing block 2...\n");
+  //cAlloc.getBlock(2).release();
+
   cAlloc.printUsedMemory();
+  cAlloc.printNumElements();
   printf("Creating Foo...\n");
-  mptr<Foo> foo1;
-  foo1->print();
-  //printf("Used memory: %d bytes\n", cAlloc.getUsedMemory());
+  {
+    mptr<Foo> foo1;
+    foo1->print();
+  }
+  cAlloc.printNumElements();
   cAlloc.printUsedMemory();
 
   return 0;
