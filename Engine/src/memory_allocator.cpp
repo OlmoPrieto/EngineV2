@@ -66,11 +66,11 @@ public:
     bool m_bFree;
   };
 
-  Allocator() {
-    m_pMemStart = (byte*)malloc(2000000);  // 2MB
+  Allocator(std::size_t uMemoryAmount) {
+    m_pMemStart = (byte*)malloc(uMemoryAmount);  // 2MB
     if (m_pMemStart != nullptr) {
       //printf("id: %d\n", sm_uBlockCount);
-      m_lBlocks.emplace_back(Block(m_pMemStart, 2000000, sm_uBlockCount));
+      m_lBlocks.emplace_back(Block(m_pMemStart, uMemoryAmount, sm_uBlockCount));
       ++sm_uBlockCount;
       m_pBigFreeBlock = &m_lBlocks.front();
       m_pFirstFreeBlock = &m_lBlocks.front();
@@ -80,7 +80,7 @@ public:
     } 
     else {
       m_pMemStart = nullptr;
-      printf("ERROR: Not enough memory!\nW: Allocator");
+      printf("ERROR: Not enough memory!\t-> W: Allocator\n");
     }
   }
 
@@ -94,6 +94,12 @@ public:
 
     if (m_pBigFreeBlock->getSize() >= uRequestedSize) {
       m_pFirstFreeBlock = m_pBigFreeBlock;
+    }
+    else {
+      m_pFirstFreeBlock = findFirstFreeBlock();
+      if (m_pFirstFreeBlock == nullptr) {
+        printf("WAO\n");
+      }
     }
 
     // This will keep giving blocks until the big block isn't enough
@@ -113,8 +119,8 @@ public:
       return pNewBlockAddress;
     }
 
-    return nullptr;
-
+    printf("Not enough memory, returning malloc() address\t-> W: Allocator::requestBlock\n");
+    return (byte*)malloc(uRequestedSize);
   }
 
   // TODO: implement a version of everything with a std::vector and compare performance
@@ -186,6 +192,15 @@ public:
   // to determine if the big block has no more free memory
   // and to find the first released block. Then is when the party start
   Block* findFirstFreeBlock() {
+    auto it = m_lBlocks.begin();
+
+    while (it != m_lBlocks.end()) {
+      if (it->isFree() == true) {
+        return &(*it);
+      }
+
+      it++;
+    }
 
     return nullptr;
   }
@@ -241,7 +256,7 @@ private:
 };
 
 uint64 Allocator::sm_uBlockCount = 0;
-Allocator cAlloc;
+Allocator cAlloc(48);
 
 // [ Managed Pointer ]
 template <class T>
@@ -249,7 +264,7 @@ class mptr {
 public:
   mptr() {
     printf("T Class size: %d\n", sizeof(T));
-
+    
     m_pPtr = new (cAlloc.requestBlock(sizeof(T))) T();
   }
 
@@ -338,6 +353,15 @@ int main() {
   cAlloc.printUsedMemory();
   cAlloc.printNumElements();
   printf("Creating Foo...\n");
+  {
+    mptr<Foo> foo1;
+    foo1->print();
+    printf("Going out of scope\n");
+  }
+  cAlloc.printNumElements();
+  cAlloc.printUsedMemory();
+
+  printf("Creating second Foo()...\n");
   {
     mptr<Foo> foo1;
     foo1->print();
