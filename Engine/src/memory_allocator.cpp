@@ -33,6 +33,10 @@ public:
       return m_uSize;
     }
 
+    uint64 getId() const {
+      return m_uId;
+    }
+
     bool isFree() const {
       return m_bFree;
     }
@@ -53,7 +57,7 @@ public:
     }
 
     void release() {
-      m_bFree = false;
+      m_bFree = true;
     }
 
     // Public variables
@@ -97,9 +101,7 @@ public:
     }
     else {
       m_pFirstFreeBlock = findFirstFreeBlock();
-      if (m_pFirstFreeBlock == nullptr) {
-        printf("WAO\n");
-      }
+      printf("Address retrieved: %p\n", m_pFirstFreeBlock->getAddress());
     }
 
     // This will keep giving blocks until the big block isn't enough
@@ -130,6 +132,8 @@ public:
     while (it != m_lBlocks.end()) {
       if (pAddress == it->getAddress()) {
         it->release();
+        m_uUsedMemory -= it->getSize();
+        printf("Releasing block %u with address: %p\n", it->getId(), pAddress);
 
         coalesceBlocks(&it);
 
@@ -155,9 +159,11 @@ public:
 
     if (pIt != nullptr) { // if an iterator is supplied, try to coalesce prev and/or next block
       // check if previous block is free
-      if (*pIt != m_lBlocks.begin()) {
-        --(*pIt); 
+      if ((*pIt) != m_lBlocks.begin()) {
+        --(*pIt);
+        printf("prev ID: %u\n", (*pIt)->getId());
         if ((*pIt)->isFree() == true) {
+          printf("Prev element free\n");
           //(*pIt)->setNextFreeBlock(&(*(*pIt)));
           (*pIt)->resize((*pIt)->getSize() + (++(*pIt))->getSize());
           m_lBlocks.erase(*pIt);  // delete current block
@@ -172,7 +178,9 @@ public:
       } 
       ++(*pIt); // if the block was coalesced, ++(*pIt) will be the next block to the current
       if (*pIt != m_lBlocks.end()) {
+        printf("next ID: %u\n", (*pIt)->getId());
         if ((*pIt)->isFree() == true) {
+          printf("Next element free\n");
           //(*pIt)->setNextFreeBlock(&(*(*pIt)));
           --(*pIt);
           (*pIt)->resize((*pIt)->getSize() + (++(*pIt))->getSize());
@@ -195,11 +203,13 @@ public:
     auto it = m_lBlocks.begin();
 
     while (it != m_lBlocks.end()) {
+      printf("findFirstFreeBlock() ID: %u\n", it->getId());
       if (it->isFree() == true) {
+        printf("Free block!\n");
         return &(*it);
       }
 
-      it++;
+      ++it;
     }
 
     return nullptr;
@@ -356,6 +366,7 @@ int main() {
   {
     mptr<Foo> foo1;
     foo1->print();
+    cAlloc.printNumElements();
     printf("Going out of scope\n");
   }
   cAlloc.printNumElements();
@@ -364,7 +375,6 @@ int main() {
   printf("Creating second Foo()...\n");
   {
     mptr<Foo> foo1;
-    foo1->print();
   }
   cAlloc.printNumElements();
   cAlloc.printUsedMemory();
