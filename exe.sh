@@ -4,6 +4,7 @@ NC='\033[0m'
 clear
 make config=release
 
-echo -e "\n${GREEN} -- Starting execution --${NC}"
+DATE=$date
+echo -e "\n${GREEN} -- Starting execution $(DATE) --${NC}"
 
 ./Engine/bin/Engine
