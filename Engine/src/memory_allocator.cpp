@@ -101,7 +101,6 @@ public:
     }
     else {
       m_pFirstFreeBlock = findFirstFreeBlock();
-      printf("Address retrieved: %p\n", m_pFirstFreeBlock->getAddress());
     }
 
     // This will keep giving blocks until the big block isn't enough
@@ -146,14 +145,14 @@ public:
   }
 
   // TODO: test all cases;
-  // release one sole block, 
+  // release one sole block, [done]
   // release one block with another free forward, 
-  // release one block with another free backward,
+  // release one block with another free backward, [done]
   // release one block with free blocks backward and forward
   //
   // @return true if could coalesce at least one block
   bool coalesceBlocks(std::list<Allocator::Block>::iterator* pIt = nullptr) {
-    printf("Coalescing!\n");
+    printf("Coalescing...\n");
     bool bReturn = false;
     bool bCoalescePrevBlock = false;
 
@@ -205,7 +204,7 @@ public:
     while (it != m_lBlocks.end()) {
       printf("findFirstFreeBlock() ID: %u\n", it->getId());
       if (it->isFree() == true) {
-        printf("Free block!\n");
+        printf("%u is a free block!\n", it->getId());
         return &(*it);
       }
 
