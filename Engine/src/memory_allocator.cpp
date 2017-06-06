@@ -1,3 +1,4 @@
+#include <cassert>
 #include <iostream>
 #include <iterator>
 #include <list>
@@ -101,6 +102,10 @@ public:
     }
     else {
       m_pFirstFreeBlock = findFirstFreeBlock();
+      if (m_pFirstFreeBlock == nullptr) {
+        printf("Not enough memory, returning malloc() address\t-> W: Allocator::requestBlock\n");
+        return (byte*)malloc(uRequestedSize);
+      }
     }
 
     // This will keep giving blocks until the big block isn't enough
@@ -120,8 +125,7 @@ public:
       return pNewBlockAddress;
     }
 
-    printf("Not enough memory, returning malloc() address\t-> W: Allocator::requestBlock\n");
-    return (byte*)malloc(uRequestedSize);
+    return nullptr;
   }
 
   // TODO: implement a version of everything with a std::vector and compare performance
@@ -214,7 +218,9 @@ public:
     return nullptr;
   }
 
-   const Allocator::Block& getBlock(short shIndex) {
+  const Allocator::Block& getBlock(short shIndex) {
+    assert(shIndex < m_lBlocks.size() && "Index greater than the list's size\n");
+
     short shTmp = 0;
     for (std::list<Allocator::Block>::const_iterator it = m_lBlocks.begin();
       it != m_lBlocks.end(); ++it) {
@@ -225,9 +231,6 @@ public:
         ++shTmp;
       }
     }
-    //std::list<Allocator::Block>::iterator it = m_lBlocks.begin();
-    //std::advance(it, 0);
-    //return *it;
   }
 
   const std::list<Allocator::Block>& getBlocks() const {
@@ -271,8 +274,14 @@ Allocator cAlloc(48);
 template <class T>
 class mptr {
 public:
+  mptr(const T& constructor) {
+    printf("T Class size: %lu\n", sizeof(T));
+    
+    m_pPtr = new (cAlloc.requestBlock(sizeof(T))) T(constructor);
+  }
+
   mptr() {
-    printf("T Class size: %d\n", sizeof(T));
+    printf("T Class size: %lu\n", sizeof(T));
     
     m_pPtr = new (cAlloc.requestBlock(sizeof(T))) T();
   }
@@ -309,6 +318,13 @@ public:
     iZ = z;
   }
 
+  Foo (const Foo& rOther) {
+    printf("Foo copy constructor\n");
+    iX = rOther.iX;
+    iY = rOther.iY;
+    iZ = rOther.iZ;
+  }
+
   void print() const {
     printf("x: %d\ty: %d\tz: %d\n", iX, iY, iZ);
   }
@@ -322,17 +338,16 @@ public:
   int iZ;
 };
 
+
 int main() {
-  printf("\n=======================\n");
+  /*printf("\n=======================\n");
   printf("\nmain()\n\n");
   printf("Stats: \n"),
   printf("sizeof int\t: %d bytes\n", sizeof(int));
   printf("sizeof float\t: %d bytes\n", sizeof(float));
   printf("sizeof double\t: %d bytes\n", sizeof(double));
   printf("sizeof byte*\t: %d bytes\n", sizeof(byte*));
-  printf("=======================\n");
-
-  printf("Created allocator\n");
+  printf("=======================\n");*/
 
   const std::list<Allocator::Block> pBlocks = cAlloc.getBlocks();
 
@@ -356,14 +371,12 @@ int main() {
   printf("Third block address: ");
   cAlloc.getBlock(2).print();
 
-  printf("Releasing block 2...\n");
-  //cAlloc.getBlock(2).release();
 
   cAlloc.printUsedMemory();
   cAlloc.printNumElements();
   printf("Creating Foo...\n");
   {
-    mptr<Foo> foo1;
+    mptr<Foo> foo1(Foo(100, 200, 300));
     foo1->print();
     cAlloc.printNumElements();
     printf("Going out of scope\n");
@@ -374,6 +387,7 @@ int main() {
   printf("Creating second Foo()...\n");
   {
     mptr<Foo> foo1;
+    foo1->print();
   }
   cAlloc.printNumElements();
   cAlloc.printUsedMemory();
