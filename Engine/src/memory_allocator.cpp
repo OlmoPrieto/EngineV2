@@ -47,8 +47,9 @@ public:
       printf("Block address: %p\tid: %u\tsize: %u \tfree: %d\n", m_pAddress, m_uId, m_uSize, m_bFree);
     }
 
-    void resize(std::size_t uNewSize, byte* pNewAddress = nullptr) {
+    void resize(std::size_t uNewSize, byte* pNewAddress = nullptr, bool bIsFree = false) {
       m_uSize = uNewSize;
+      m_bFree = bIsFree;
       if (pNewAddress != nullptr) {
         m_pAddress = pNewAddress;
       }
@@ -80,7 +81,7 @@ public:
     printf("Starting address: \t%p\nMax address: \t\t%p\n", m_pMemStart, m_pMemStart + uMemoryAmount);
     if (m_pMemStart != nullptr) {
       //printf("id: %d\n", sm_uBlockCount);
-      m_lBlocks.emplace_back(Block(m_pMemStart, uMemoryAmount, sm_uBlockCount));
+      m_lBlocks.emplace_back(Block(m_pMemStart, uMemoryAmount, sm_uBlockCount, nullptr, true));
       ++sm_uBlockCount;
       m_pBigFreeBlock = &m_lBlocks.front();
       m_pFirstFreeBlock = &m_lBlocks.front();
@@ -101,52 +102,41 @@ public:
   }
 
   byte* requestBlock(std::size_t uRequestedSize) {
-    bool bFreeBlockEnough = true;
 
-    if (m_pBigFreeBlock->getSize() >= uRequestedSize) {
-      printf("Big block big enough\n");
-      m_pFirstFreeBlock = m_pBigFreeBlock;
-    }
-    else {
-      printf("Big block not big enough, finding first free block...\n");
+    byte* pNewBlockAddress = (byte*)(m_pFirstFreeBlock->getAddress());
+    uint64 uFirstFreeBlockSize = m_pFirstFreeBlock->getSize();
+    uint64 uResizedMemAmount = uFirstFreeBlockSize;
+    bool bUseCurrentBlock = true;
+
+    if (uFirstFreeBlockSize < uRequestedSize) {
       m_pFirstFreeBlock = findFirstFreeBlock();
-      bFreeBlockEnough = false;
+
       if (m_pFirstFreeBlock == nullptr) {
         printf("Not enough memory, returning malloc() address\t-> W: Allocator::requestBlock\n");
         return (byte*)malloc(uRequestedSize);
       }
     }
 
-    // This will keep giving blocks until the big block isn't enough
-    // TODO: manage freed blocks -> split them as needed 
-    //    -> check if prev/next block is free and join them
-    if (m_pFirstFreeBlock->getSize() >= uRequestedSize) {
-      byte* pNewBlockAddress = (byte*)(m_pFirstFreeBlock->getAddress());
-      int64 uMemLeftover = m_pFirstFreeBlock->getSize() - uRequestedSize;
-      if (uMemLeftover > 0) {
-        printf("Memory leftovers: %d\n", uMemLeftover);
-      }
-      //printf("New address for the resized block: %p\n", (byte*)(m_pFirstFreeBlock->getAddress()) + uRequestedSize);
-      /*m_pFirstFreeBlock->resize(m_pFirstFreeBlock->getSize() - uRequestedSize, 
-        (byte*)(m_pFirstFreeBlock->getAddress()) + uRequestedSize);
+    if (uFirstFreeBlockSize >= uRequestedSize) {
+      if (uFirstFreeBlockSize > uRequestedSize) {
+        pNewBlockAddress = (byte*)(m_pFirstFreeBlock->getAddress()) + m_pFirstFreeBlock->getSize() - uRequestedSize;
+        uResizedMemAmount -= uRequestedSize;
+        bUseCurrentBlock = false;
 
-      m_lBlocks.emplace_back(Block(pNewBlockAddress, uRequestedSize, sm_uBlockCount), nullptr, true);
-      ++sm_uBlockCount;*/
-      m_lBlocks.emplace_back(Block((byte*)(m_pFirstFreeBlock->getAddress()) + m_pFirstFreeBlock->getSize() - uRequestedSize, 
-        uRequestedSize, sm_uBlockCount));
-      ++sm_uBlockCount;
-      
-      m_pFirstFreeBlock->resize(m_pFirstFreeBlock->getSize() - uRequestedSize);
-
-      // TODO: watch out! now it will always traverse the list to find the 
-      //   first free block. Add a second list/vector with free blocks!!
-      /*if (bFreeBlockEnough == false) {
-        m_lBlocks.emplace_back(Block(pNewBlockAddress + uRequestedSize, 
-          uMemLeftover, sm_uBlockCount, nullptr, true));
+        m_lBlocks.emplace_back(Block(pNewBlockAddress, uRequestedSize, sm_uBlockCount, nullptr, bUseCurrentBlock));
         ++sm_uBlockCount;
-      }*/
 
-      m_uUsedMemory += uRequestedSize;
+        m_uUsedMemory += uRequestedSize;
+      }
+      else if (uFirstFreeBlockSize == uRequestedSize) {
+        bUseCurrentBlock = false;
+        m_uUsedMemory += uRequestedSize;
+        printf("???\n");
+      }
+      if (m_pFirstFreeBlock->getId() == 0) {
+        printf("Giving block 0!\n");
+      }
+      m_pFirstFreeBlock->resize(uResizedMemAmount, nullptr, bUseCurrentBlock);
 
       return pNewBlockAddress;
     }
@@ -165,13 +155,12 @@ public:
         printf("Releasing block %u with address: %p\n", it->getId(), pAddress);
 
         coalesceBlocks(&it);
+        //printf("&it is pointing to: ");
+        //it->print();
 
         break;
       }
       else {
-        if (it->getId() == 0) {
-          printf("Trying to release the first big block\n");
-        }
         ++it;
       }
     }
@@ -347,7 +336,7 @@ class mptr {
 public:
   mptr(const T& constructor) {
     printf("T Class size: %lu\n", sizeof(T));
-    
+
     m_pPtr = new (cAlloc.requestBlock(sizeof(T))) T(constructor);
   }
 
@@ -445,6 +434,9 @@ int main() {
   cAlloc.getBlock(1).print();
   printf("Third block address: ");
   cAlloc.getBlock(2).print();*/
+printf("\n\nAll elements:\n\n");
+  cAlloc.printAllElements();
+  printf("\n\n");
 
   //printf("Creating Foo 1...\n");
   mptr<Foo> foo1;
@@ -458,6 +450,9 @@ int main() {
   printf("\n\nAll elements:\n\n");
   cAlloc.printAllElements();
   printf("\n\n");
+
+
+  cAlloc.printUsedMemory();
 
   printf("Releasing Foo 3...\n");
   foo3.release();
@@ -494,7 +489,7 @@ int main() {
   printf("\n\n");
   
   printf("\n\nInit test...\n");
-  for (int i = 0; i < 2; ++i) {
+  for (int i = 0; i < 3; ++i) {
     printf("\n-- Loop %d --\n", i);
     printf("\n\nAll elements:\n\n");
     cAlloc.printAllElements();
