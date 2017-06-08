@@ -108,7 +108,7 @@ public:
     uint64 uResizedMemAmount = uFirstFreeBlockSize;
     bool bUseCurrentBlock = true;
 
-    if (uFirstFreeBlockSize < uRequestedSize) {
+    if (uFirstFreeBlockSize < uRequestedSize || m_pFirstFreeBlock->isFree() == false) {
       m_pFirstFreeBlock = findFirstFreeBlock();
 
       if (m_pFirstFreeBlock == nullptr) {
@@ -127,11 +127,12 @@ public:
         ++sm_uBlockCount;
 
         m_uUsedMemory += uRequestedSize;
+
+        bUseCurrentBlock = true;
       }
       else if (uFirstFreeBlockSize == uRequestedSize) {
         bUseCurrentBlock = false;
         m_uUsedMemory += uRequestedSize;
-        printf("???\n");
       }
       if (m_pFirstFreeBlock->getId() == 0) {
         printf("Giving block 0!\n");
@@ -146,10 +147,10 @@ public:
 
   // TODO: implement a version of everything with a std::vector and compare performance
   void releaseBlock(byte* pAddress) {
-    printf("Releasing block...\n");
+    printf("Trying to release block with address %p...\n", pAddress);
     auto it = m_lBlocks.begin();
     while (it != m_lBlocks.end()) {
-      if (pAddress == it->getAddress() && it->getId() != 0) {
+      if (pAddress == it->getAddress()) {//} && it->getId() != 0) {
         it->release();
         m_uUsedMemory -= it->getSize();
         printf("Releasing block %u with address: %p\n", it->getId(), pAddress);
@@ -434,19 +435,19 @@ int main() {
   cAlloc.getBlock(1).print();
   printf("Third block address: ");
   cAlloc.getBlock(2).print();*/
-printf("\n\nAll elements:\n\n");
+  printf("\n\nAll elements:\n\n");
   cAlloc.printAllElements();
   printf("\n\n");
 
   //printf("Creating Foo 1...\n");
   mptr<Foo> foo1;
-
+  cAlloc.printUsedMemory();
   //printf("Creating Foo 2...\n");
   mptr<Foo> foo2;
-
+  cAlloc.printUsedMemory();
   //printf("Creating Foo 3...\n");
   mptr<Foo> foo3;
-
+  cAlloc.printUsedMemory();
   printf("\n\nAll elements:\n\n");
   cAlloc.printAllElements();
   printf("\n\n");
@@ -488,6 +489,15 @@ printf("\n\nAll elements:\n\n");
   cAlloc.printAllElements();
   printf("\n\n");
   
+  printf("Releasing Foo 2...\n");
+  foo2.release();
+
+  printf("\n\nAll elements:\n\n");
+  cAlloc.printAllElements();
+  printf("\n\n");
+
+  cAlloc.printUsedMemory();
+
   printf("\n\nInit test...\n");
   for (int i = 0; i < 3; ++i) {
     printf("\n-- Loop %d --\n", i);
