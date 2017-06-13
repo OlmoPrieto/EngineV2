@@ -190,37 +190,37 @@ public:
         if ((*pIt)->isFree() == true) {
           printf("Prev element free, coalescing\n");
           //(*pIt)->setNextFreeBlock(&(*(*pIt)));
-          (*pIt)->resize((*pIt)->getSize() + (++(*pIt))->getSize());
+          (*pIt)->resize((*pIt)->getSize() + (++(*pIt))->getSize(), nullptr, true);
           printf("This block now has a size of %u bytes\n", (--(*pIt))->getSize());
-          (++(*pIt));
-          auto aOther = pIt;
-          /*for (auto aTmp = m_lBlocks.begin(); aTmp != m_lBlocks.end(): ++aTmp) {
-            if (aTmp == (*pIt)) {
-              aOther = aTmp;
-              break;
-            }
-          }*/
+          (++(*pIt)); // remove along with printf
+
           m_lBlocks.erase(*pIt);  // delete current block
-          pIt = aOther;
           bReturn = true;
           bCoalescePrevBlock = true;
         }
       }
+      else {
+        bCoalescePrevBlock = true;  // pIt points to list::begin
+      }
 
       // check if next block is free
+      // the only reason for entering to this code is that
+      //  you are in the middle of the list and the prev block isn't free
       if (bCoalescePrevBlock == false) {
         ++(*pIt);
-        (*pIt)->print();
-      } 
+        if (*pIt != m_lBlocks.end()) {  // remove if() when removing ->print()
+          (*pIt)->print();
+        }
+      }
       ++(*pIt); // if the block was coalesced, ++(*pIt) will be the next block to the current
-      (*pIt)->print();
       if (*pIt != m_lBlocks.end()) {
+        (*pIt)->print();
         printf("next ID: %u\n", (*pIt)->getId());
         if ((*pIt)->isFree() == true) {
           printf("Next element free, coalescing\n");
           //(*pIt)->setNextFreeBlock(&(*(*pIt)));
           --(*pIt);
-          (*pIt)->resize((*pIt)->getSize() + (++(*pIt))->getSize());
+          (*pIt)->resize((*pIt)->getSize() + (++(*pIt))->getSize(), nullptr, true);
           m_lBlocks.erase((*pIt));
           bReturn = true;
         }
@@ -462,6 +462,8 @@ int main() {
   cAlloc.printAllElements();
   printf("\n\n");
 
+  cAlloc.printUsedMemory();
+
   {
     //printf("Creating Foo...\n");
     mptr<Foo> foo1(Foo(100, 200, 300));
@@ -469,6 +471,7 @@ int main() {
     printf("\n\nAll elements:\n\n");
     cAlloc.printAllElements();
     printf("\n\n");
+    cAlloc.printUsedMemory();
   }
 
   // after here, the big block is exhausted
@@ -488,6 +491,7 @@ int main() {
   printf("\n\nAll elements:\n\n");
   cAlloc.printAllElements();
   printf("\n\n");
+  cAlloc.printUsedMemory();
   
   printf("Releasing Foo 2...\n");
   foo2.release();
@@ -504,6 +508,7 @@ int main() {
     printf("\n\nAll elements:\n\n");
     cAlloc.printAllElements();
     printf("\n\n");
+    cAlloc.printUsedMemory();
     mptr<Foo> foo1;
     cAlloc.printNumElements();
     cAlloc.printUsedMemory();
