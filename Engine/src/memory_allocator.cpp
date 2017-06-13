@@ -112,6 +112,7 @@ public:
       m_pFirstFreeBlock = findFirstFreeBlock();
 
       if (m_pFirstFreeBlock == nullptr) {
+        // TODO: implement a system to alloc another big block of memory and manage this new big blocks
         printf("Not enough memory, returning malloc() address\t-> W: Allocator::requestBlock\n");
         return (byte*)malloc(uRequestedSize);
       }
@@ -259,7 +260,7 @@ public:
   const Allocator::Block& getBlock(short shIndex) {
     assert(shIndex < m_lBlocks.size() && "Index greater than the list's size\n");
 
-    short shTmp = 0;
+    /*short shTmp = 0;
     for (std::list<Allocator::Block>::const_iterator it = m_lBlocks.begin();
       it != m_lBlocks.end(); ++it) {
       if (shTmp == shIndex) {
@@ -268,7 +269,11 @@ public:
       else {
         ++shTmp;
       }
-    }
+    }*/
+
+    auto it = m_lBlocks.begin();
+    std::advance(it, shIndex);
+    return *it;
   }
 
   const std::list<Allocator::Block>& getBlocks() const {
@@ -329,7 +334,7 @@ private:
 };
 
 uint64 Allocator::sm_uBlockCount = 0;
-Allocator cAlloc(48);
+Allocator cAlloc(1024);
 
 // [ Managed Pointer ]
 template <class T>
@@ -414,27 +419,6 @@ int main() {
   printf("sizeof byte*\t: %d bytes\n", sizeof(byte*));
   printf("=======================\n");*/
 
-  /*const std::list<Allocator::Block> pBlocks = cAlloc.getBlocks();
-
-  printf("First block address: ");
-  pBlocks.front().print();
-
-  printf("\nRequesting block...\n");
-  cAlloc.requestBlock(32);
-
-  printf("First block address (big free block): ");
-  cAlloc.getBlock(0).print();
-  printf("Second block address: ");
-  cAlloc.getBlock(1).print();
-
-  printf("\nRequesting block...\n");
-  cAlloc.requestBlock(4);
-  printf("First block address (big free block): ");
-  cAlloc.getBlock(0).print();
-  printf("Second block address: ");
-  cAlloc.getBlock(1).print();
-  printf("Third block address: ");
-  cAlloc.getBlock(2).print();*/
   printf("\n\nAll elements:\n\n");
   cAlloc.printAllElements();
   printf("\n\n");
@@ -451,7 +435,6 @@ int main() {
   printf("\n\nAll elements:\n\n");
   cAlloc.printAllElements();
   printf("\n\n");
-
 
   cAlloc.printUsedMemory();
 
