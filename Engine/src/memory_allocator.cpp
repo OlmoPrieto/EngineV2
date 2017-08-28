@@ -3,6 +3,8 @@
 #include <iterator>
 #include <list>
 
+#define USE_FIRST_BIG_BLOCK 1
+
 typedef unsigned char byte;
 typedef unsigned int uint64;
 typedef int int64;
@@ -11,7 +13,9 @@ class Allocator {
 public:
   class Block {
   public:
-    Block(byte* pAddress, std::size_t uSize, uint64 uId = 65536, Block* pNextFreeBlock = nullptr, bool bFree = false) {
+    Block(byte* pAddress, std::size_t uSize, uint64 uId = 65536, 
+        Block* pNextFreeBlock = nullptr, bool bFree = false) {
+      
       m_pAddress = pAddress;
       m_pNextFreeBlock = pNextFreeBlock;
       m_uSize = uSize;
@@ -77,10 +81,9 @@ public:
 
   Allocator(std::size_t uMemoryAmount) {
     m_uMaxMemory = uMemoryAmount;
-    m_pMemStart = (byte*)malloc(uMemoryAmount);  // 2MB
+    m_pMemStart = (byte*)malloc(uMemoryAmount);
     printf("Starting address: \t%p\nMax address: \t\t%p\n", m_pMemStart, m_pMemStart + uMemoryAmount);
     if (m_pMemStart != nullptr) {
-      //printf("id: %d\n", sm_uBlockCount);
       m_lBlocks.emplace_back(Block(m_pMemStart, uMemoryAmount, sm_uBlockCount, nullptr, true));
       ++sm_uBlockCount;
       m_pBigFreeBlock = &m_lBlocks.front();
@@ -109,7 +112,18 @@ public:
     bool bUseCurrentBlock = true;
 
     if (uFirstFreeBlockSize < uRequestedSize || m_pFirstFreeBlock->isFree() == false) {
-      m_pFirstFreeBlock = findFirstFreeBlock();
+      uint64 loops = 0;
+      do {
+        m_pFirstFreeBlock = findFirstFreeBlock();
+        uFirstFreeBlockSize = m_pFirstFreeBlock->getSize();
+
+        loops++;
+        if (loops > 1000) {
+          m_pFirstFreeBlock = nullptr;
+
+          break;
+        }
+      } while (uFirstFreeBlockSize < uRequestedSize);
 
       if (m_pFirstFreeBlock == nullptr) {
         // TODO: implement a system to alloc another big block of memory and manage this new big blocks
@@ -120,11 +134,13 @@ public:
 
     if (uFirstFreeBlockSize >= uRequestedSize) {
       if (uFirstFreeBlockSize > uRequestedSize) {
-        pNewBlockAddress = (byte*)(m_pFirstFreeBlock->getAddress()) + m_pFirstFreeBlock->getSize() - uRequestedSize;
+        pNewBlockAddress = (byte*)(m_pFirstFreeBlock->getAddress()) + 
+          m_pFirstFreeBlock->getSize() - uRequestedSize;
         uResizedMemAmount -= uRequestedSize;
         bUseCurrentBlock = false;
 
-        m_lBlocks.emplace_back(Block(pNewBlockAddress, uRequestedSize, sm_uBlockCount, nullptr, bUseCurrentBlock));
+        m_lBlocks.emplace_back(Block(pNewBlockAddress, uRequestedSize, 
+          sm_uBlockCount, nullptr, bUseCurrentBlock));
         ++sm_uBlockCount;
 
         m_uUsedMemory += uRequestedSize;
@@ -132,15 +148,20 @@ public:
         bUseCurrentBlock = true;
       }
       else if (uFirstFreeBlockSize == uRequestedSize) {
+        // don't create another block, use this one
+        printf("Reusing existing block\n");
         bUseCurrentBlock = false;
         m_uUsedMemory += uRequestedSize;
       }
       if (m_pFirstFreeBlock->getId() == 0) {
-        printf("Giving block 0!\n");
+        printf("Splitting block 0!\n");
       }
       m_pFirstFreeBlock->resize(uResizedMemAmount, nullptr, bUseCurrentBlock);
 
       return pNewBlockAddress;
+    }
+    else {
+      printf("First free block hadn't enought memory available\n");
     }
 
     return nullptr;
@@ -236,7 +257,7 @@ public:
     return bReturn;
   }
 
-  //  Engine should call this time by time 
+  //  Engine should call this from time to time 
   // to determine if the big block has no more free memory
   // and to find the first released block. Then is when the party start
   //  Do not call this if not trying to find a block because this can return nullptr

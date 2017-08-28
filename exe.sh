@@ -2,7 +2,7 @@ GREEN='\033[0;32m'
 NC='\033[0m'
 
 clear
-make config=release
+make config=release -j
 
 DATE=$date
 echo -e "\n${GREEN} -- Starting execution $(DATE) --${NC}"

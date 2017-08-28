@@ -1,0 +1,22 @@
+=====================================================
+                       TO DO
+=====================================================
+
+-------
+V 0.0.1
+
+-> Features Expected:
+  - elm::mptr fully working
+  
+  -> Allocator:
+    - No memory loss
+    
+    -> Coalescing
+      - Coalesce with previous block 
+      - Coalesce with next block 
+    -> Requesting blocks
+      - Split initial block
+      - Policy: split initial block further or try to best fit?
+        - Now it splits the initial block
+
+-------
