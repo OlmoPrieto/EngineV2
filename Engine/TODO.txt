@@ -19,10 +19,11 @@ V 0.0.1
       - Policy: split initial block further or try to best fit?
         - Now it splits the initial block
 
+      - When trying to request a free block,
+        if the Allocator cannot retrieve one,
+        do a coalesce pass and try to get a block again
 
-        ver por que crashea
-        mirar como se dividen los bloques
-        se cortan los bloques por la parte de atras
 
+      REVISAR FINALIZACION DEL PROGRAMA
 
 -------

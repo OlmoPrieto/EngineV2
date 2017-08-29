@@ -105,6 +105,8 @@ public:
   }
 
   ~Allocator() {
+    printAllElements();
+
     if (m_pMemStart != nullptr) {
       free(m_pMemStart);
     }
@@ -227,8 +229,66 @@ public:
 
     if (pIt != nullptr) {
     //if (pIt != nullptr  && (*pIt)->getId() != 0) { // if an iterator is supplied, try to coalesce prev and/or next block
+      bool bChangedBlock = false;
+      bool bTriedToCoalesce = false;
       // check if previous block is free
       if ((*pIt) != m_lBlocks.begin()) {
+        // new method
+        bTriedToCoalesce = true;
+
+        Block* pBlockToCoalesce = &(*(*pIt));
+        Block* pPrevBlock = nullptr;
+
+        uint64 uCurrentSize = pBlockToCoalesce->getSize();
+        uint64 uPrevSize = 0;
+
+        const byte* uCurrentBlockAddress = pBlockToCoalesce->getAddress();
+        
+        // check previous block (by ID)
+        --(*pIt);
+        pPrevBlock = &(*(*pIt));
+        uPrevSize = pPrevBlock->getSize();
+
+        pBlockToCoalesce->print();
+        pPrevBlock->print();
+
+        if ((*pIt)->getAddress() < pBlockToCoalesce->getAddress()) {
+          //++(*pIt);
+          pBlockToCoalesce = &(*(*pIt));
+          //--(*pIt);
+          uCurrentSize = pBlockToCoalesce->getSize();
+          
+          ++(*pIt);
+          pPrevBlock = &(*(*pIt));
+          uPrevSize = pPrevBlock->getSize();
+
+          bChangedBlock = true;
+        }
+
+        if (pPrevBlock->isFree() == true) {
+          printf("Prev element free, coalescing\n");
+          pBlockToCoalesce->resize(pBlockToCoalesce->getSize() + 
+            pPrevBlock->getSize(), nullptr, true);
+          pBlockToCoalesce->print();
+          if (bChangedBlock == true) {
+            //--(*pIt);
+          }
+          m_lBlocks.erase(*pIt);
+          bReturn = true;
+          bCoalescePrevBlock = true;
+        }
+      }
+      else {
+        bCoalescePrevBlock = true;  // pIt points to list::begin
+      }
+
+      if (bCoalescePrevBlock == true) {
+        ++(*pIt);
+      }
+      else {
+        ++(*pIt);
+      }
+      if (std::next(*pIt, 1) != m_lBlocks.end() && *pIt != m_lBlocks.end()) {
         // new method
         Block* pBlockToCoalesce = &(*(*pIt));
         Block* pPrevBlock = nullptr;
@@ -237,18 +297,20 @@ public:
         uint64 uPrevSize = 0;
 
         const byte* uCurrentBlockAddress = pBlockToCoalesce->getAddress();
-
-        bool bChangedBlock = false;    
         
         // check previous block (by ID)
-        --(*pIt);
+        ++(*pIt);
         pPrevBlock = &(*(*pIt));
         uPrevSize = pPrevBlock->getSize();
+
+        pBlockToCoalesce->print();
+        pPrevBlock->print();
+
         if ((*pIt)->getAddress() < uCurrentBlockAddress) {
           pPrevBlock = pBlockToCoalesce;
           uPrevSize = uCurrentSize;
           
-          ++(*pIt);
+          --(*pIt);
           pBlockToCoalesce = &(*(*pIt));
           uCurrentSize = pBlockToCoalesce->getSize();
 
@@ -256,7 +318,7 @@ public:
         }
 
         if (pPrevBlock->isFree() == true) {
-          printf("Prev element free, coalescing\n");
+          printf("Next element free, coalescing\n");
           pBlockToCoalesce->resize(pBlockToCoalesce->getSize() + 
             pPrevBlock->getSize(), nullptr, true);
 
@@ -267,50 +329,8 @@ public:
           bReturn = true;
           bCoalescePrevBlock = true;
         }
-
-        // old method
-        // --(*pIt);
-        // printf("prev ID: %u\n", (*pIt)->getId());
-        // if ((*pIt)->isFree() == true) {
-        //   printf("Prev element free, coalescing\n");
-        //   //(*pIt)->setNextFreeBlock(&(*(*pIt)));
-        //   bool bIsFree = (*pIt)->isFree(); // not needed
-        //   (*pIt)->resize((*pIt)->getSize() + (++(*pIt))->getSize(), nullptr, bIsFree);
-        //   printf("This block now has a size of %u bytes\n", (--(*pIt))->getSize());
-        //   (++(*pIt)); // remove along with printf
-
-        //   m_lBlocks.erase(*pIt);  // delete current block
-        //   bReturn = true;
-        //   bCoalescePrevBlock = true;
-        // }
-      }
-      else {
-        bCoalescePrevBlock = true;  // pIt points to list::begin
       }
 
-      //  check if next block is free
-      //  the only reason for entering to this code is if
-      // you are in the middle of the list and the prev block isn't free
-      if (bCoalescePrevBlock == false) {
-        ++(*pIt);
-        if (*pIt != m_lBlocks.end()) {  // remove if() when removing ->print()
-          (*pIt)->print();
-        }
-      }
-      ++(*pIt); // if the block was coalesced, ++(*pIt) will be the next block to the current
-      if (*pIt != m_lBlocks.end()) {
-        (*pIt)->print();
-        printf("next ID: %u\n", (*pIt)->getId());
-        if ((*pIt)->isFree() == true) {
-          printf("Next element free, coalescing\n");
-          //(*pIt)->setNextFreeBlock(&(*(*pIt)));
-          --(*pIt);
-          bool bIsFree = (*pIt)->isFree();  // not needed
-          (*pIt)->resize((*pIt)->getSize() + (++(*pIt))->getSize(), nullptr, bIsFree);
-          m_lBlocks.erase((*pIt));
-          bReturn = true;
-        }
-      }
       printf("Elements after coalescing: ");
       printNumElements();
     }
