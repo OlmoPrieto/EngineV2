@@ -3,11 +3,17 @@
 #include <iterator>
 #include <list>
 
+#include "chrono.h"
+
 #define USE_FIRST_BIG_BLOCK 1
+#define ALLOC_POLICY_BEST_FIT 1
+#define ALLOC_POLICY_SPLIT_BIG_BLOCK (ALLOC_POLICY_BEST_FIT == 0)
 
 typedef unsigned char byte;
 typedef unsigned int uint64;
 typedef int int64;
+
+Chrono cChrono;
 
 class Allocator {
 public:
@@ -106,15 +112,25 @@ public:
 
   byte* requestBlock(std::size_t uRequestedSize) {
 
+    cChrono.start();
+
+    #if (ALLOC_POLICY_BEST_FIT == 1)
+      m_pFirstFreeBlock = findFirstFreeBlock(uRequestedSize);
+    #elif (ALLOC_POLICY_SPLIT_BIG_BLOCK == 1)
+      m_pFirstFreeBlock = m_pBigFreeBlock;
+    #endif
+
     byte* pNewBlockAddress = (byte*)(m_pFirstFreeBlock->getAddress());
     uint64 uFirstFreeBlockSize = m_pFirstFreeBlock->getSize();
     uint64 uResizedMemAmount = uFirstFreeBlockSize;
     bool bUseCurrentBlock = true;
 
-    if (uFirstFreeBlockSize < uRequestedSize || m_pFirstFreeBlock->isFree() == false) {
+    if (uFirstFreeBlockSize < uRequestedSize || m_pFirstFreeBlock->isFree() == false || 
+      m_pFirstFreeBlock == nullptr) {
+      
       uint64 loops = 0;
       do {
-        m_pFirstFreeBlock = findFirstFreeBlock();
+        m_pFirstFreeBlock = findFirstFreeBlock(uRequestedSize);
         uFirstFreeBlockSize = m_pFirstFreeBlock->getSize();
 
         loops++;
@@ -139,6 +155,9 @@ public:
         uResizedMemAmount -= uRequestedSize;
         bUseCurrentBlock = false;
 
+        printf("new block address: %p\n", pNewBlockAddress);
+        m_pFirstFreeBlock->print();
+
         m_lBlocks.emplace_back(Block(pNewBlockAddress, uRequestedSize, 
           sm_uBlockCount, nullptr, bUseCurrentBlock));
         ++sm_uBlockCount;
@@ -148,7 +167,7 @@ public:
         bUseCurrentBlock = true;
       }
       else if (uFirstFreeBlockSize == uRequestedSize) {
-        // don't create another block, use this one
+        // don't create another block, use the first free one without splitting
         printf("Reusing existing block\n");
         bUseCurrentBlock = false;
         m_uUsedMemory += uRequestedSize;
@@ -158,10 +177,13 @@ public:
       }
       m_pFirstFreeBlock->resize(uResizedMemAmount, nullptr, bUseCurrentBlock);
 
+      cChrono.stop();
+      printf("\n\nTime to request block: %.2f\n\n", cChrono.timeAsMilliseconds());
+
       return pNewBlockAddress;
     }
     else {
-      printf("First free block hadn't enought memory available\n");
+      printf("First free block hadn't enough memory available\n");
     }
 
     return nullptr;
@@ -191,9 +213,9 @@ public:
 
   // TODO: test all cases;
   // release one sole block, [done]
-  // release one block with another free forward, 
+  // release one block with another free forward, [done]
   // release one block with another free backward, [done]
-  // release one block with free blocks backward and forward
+  // release one block with free blocks backward and forward [done]
   //
   // @return true if could coalesce at least one block
   bool coalesceBlocks(std::list<Allocator::Block>::iterator* pIt = nullptr) {
@@ -207,27 +229,68 @@ public:
     //if (pIt != nullptr  && (*pIt)->getId() != 0) { // if an iterator is supplied, try to coalesce prev and/or next block
       // check if previous block is free
       if ((*pIt) != m_lBlocks.begin()) {
-        --(*pIt);
-        printf("prev ID: %u\n", (*pIt)->getId());
-        if ((*pIt)->isFree() == true) {
-          printf("Prev element free, coalescing\n");
-          //(*pIt)->setNextFreeBlock(&(*(*pIt)));
-          (*pIt)->resize((*pIt)->getSize() + (++(*pIt))->getSize(), nullptr, true);
-          printf("This block now has a size of %u bytes\n", (--(*pIt))->getSize());
-          (++(*pIt)); // remove along with printf
+        // new method
+        Block* pBlockToCoalesce = &(*(*pIt));
+        Block* pPrevBlock = nullptr;
 
-          m_lBlocks.erase(*pIt);  // delete current block
+        uint64 uCurrentSize = pBlockToCoalesce->getSize();
+        uint64 uPrevSize = 0;
+
+        const byte* uCurrentBlockAddress = pBlockToCoalesce->getAddress();
+
+        bool bChangedBlock = false;    
+        
+        // check previous block (by ID)
+        --(*pIt);
+        pPrevBlock = &(*(*pIt));
+        uPrevSize = pPrevBlock->getSize();
+        if ((*pIt)->getAddress() < uCurrentBlockAddress) {
+          pPrevBlock = pBlockToCoalesce;
+          uPrevSize = uCurrentSize;
+          
+          ++(*pIt);
+          pBlockToCoalesce = &(*(*pIt));
+          uCurrentSize = pBlockToCoalesce->getSize();
+
+          bChangedBlock = true;
+        }
+
+        if (pPrevBlock->isFree() == true) {
+          printf("Prev element free, coalescing\n");
+          pBlockToCoalesce->resize(pBlockToCoalesce->getSize() + 
+            pPrevBlock->getSize(), nullptr, true);
+
+          if (bChangedBlock == true) {
+            --(*pIt);
+          }
+          m_lBlocks.erase(*pIt);
           bReturn = true;
           bCoalescePrevBlock = true;
         }
+
+        // old method
+        // --(*pIt);
+        // printf("prev ID: %u\n", (*pIt)->getId());
+        // if ((*pIt)->isFree() == true) {
+        //   printf("Prev element free, coalescing\n");
+        //   //(*pIt)->setNextFreeBlock(&(*(*pIt)));
+        //   bool bIsFree = (*pIt)->isFree(); // not needed
+        //   (*pIt)->resize((*pIt)->getSize() + (++(*pIt))->getSize(), nullptr, bIsFree);
+        //   printf("This block now has a size of %u bytes\n", (--(*pIt))->getSize());
+        //   (++(*pIt)); // remove along with printf
+
+        //   m_lBlocks.erase(*pIt);  // delete current block
+        //   bReturn = true;
+        //   bCoalescePrevBlock = true;
+        // }
       }
       else {
         bCoalescePrevBlock = true;  // pIt points to list::begin
       }
 
-      // check if next block is free
-      // the only reason for entering to this code is that
-      //  you are in the middle of the list and the prev block isn't free
+      //  check if next block is free
+      //  the only reason for entering to this code is if
+      // you are in the middle of the list and the prev block isn't free
       if (bCoalescePrevBlock == false) {
         ++(*pIt);
         if (*pIt != m_lBlocks.end()) {  // remove if() when removing ->print()
@@ -242,7 +305,8 @@ public:
           printf("Next element free, coalescing\n");
           //(*pIt)->setNextFreeBlock(&(*(*pIt)));
           --(*pIt);
-          (*pIt)->resize((*pIt)->getSize() + (++(*pIt))->getSize(), nullptr, true);
+          bool bIsFree = (*pIt)->isFree();  // not needed
+          (*pIt)->resize((*pIt)->getSize() + (++(*pIt))->getSize(), nullptr, bIsFree);
           m_lBlocks.erase((*pIt));
           bReturn = true;
         }
@@ -261,15 +325,31 @@ public:
   // to determine if the big block has no more free memory
   // and to find the first released block. Then is when the party start
   //  Do not call this if not trying to find a block because this can return nullptr
-  Block* findFirstFreeBlock() {
+  Block* findFirstFreeBlock(uint64 uSize = 0) {
     auto it = m_lBlocks.begin();
 
     while (it != m_lBlocks.end()) {
       printf("findFirstFreeBlock() ID: %u\n", it->getId());
       if (it->isFree() == true) {
-        printf("Found free block: ");
-        it->print();
-        return &(*it);
+        #if (ALLOC_POLICY_BEST_FIT == 1)
+          if (it->getSize() >= uSize) {
+            printf("Found free block: ");
+            it->print();
+
+            return &(*it);
+          }
+        #elif (ALLOC_POLICY_SPLIT_BIG_BLOCK == 1)
+          if (m_pBigFreeBlock->getSize() < uRequestedSize) {
+            printf("WARNING, first big block not big enough");
+          }
+          return m_pBigFreeBlock;
+        #else
+
+          printf("Found free block: ");
+          it->print();
+
+          return &(*it);
+        #endif
       }
 
       ++it;
@@ -324,7 +404,6 @@ public:
 
     while (it != m_lBlocks.end()) {
       it->print();
-
       ++it;
       //std::advance(it, 1);
     }
@@ -355,7 +434,7 @@ private:
 };
 
 uint64 Allocator::sm_uBlockCount = 0;
-Allocator cAlloc(1024);
+Allocator cAlloc(64);
 
 // [ Managed Pointer ]
 template <class T>

@@ -19,4 +19,10 @@ V 0.0.1
       - Policy: split initial block further or try to best fit?
         - Now it splits the initial block
 
+
+        ver por que crashea
+        mirar como se dividen los bloques
+        se cortan los bloques por la parte de atras
+
+
 -------
