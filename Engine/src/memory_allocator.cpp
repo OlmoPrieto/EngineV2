@@ -132,14 +132,19 @@ public:
       m_pFirstFreeBlock = m_pBigFreeBlock;
     #endif
 
+    if (m_pFirstFreeBlock == nullptr) {
+      // TODO: implement a system to alloc another big block of memory and manage this new big blocks
+      printf("Not enough memory, returning malloc() address\t-> W: Allocator::requestBlock\n");
+      return (byte*)malloc(uRequestedSize);
+    }
+
     byte* pNewBlockAddress = (byte*)(m_pFirstFreeBlock->getAddress());
     uint64 uFirstFreeBlockSize = m_pFirstFreeBlock->getSize();
     uint64 uResizedMemAmount = uFirstFreeBlockSize;
     bool bUseCurrentBlock = true;
 
-    if (uFirstFreeBlockSize < uRequestedSize || m_pFirstFreeBlock->isFree() == false || 
-      m_pFirstFreeBlock == nullptr) {
-      
+    if (uFirstFreeBlockSize < uRequestedSize || m_pFirstFreeBlock->isFree() == false) {
+
       uint64 loops = 0;
       do {
         m_pFirstFreeBlock = findFirstFreeBlock(uRequestedSize);

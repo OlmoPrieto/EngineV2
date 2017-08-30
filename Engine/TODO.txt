@@ -17,13 +17,12 @@ V 0.0.1
     -> Requesting blocks
       - Split initial block
       - Policy: split initial block further or try to best fit?
-        - Now it splits the initial block
+        - Implemented best fit
+        - Split initial block and then best fit -> TODO
 
       - When trying to request a free block,
         if the Allocator cannot retrieve one,
         do a coalesce pass and try to get a block again
 
-
-      REVISAR FINALIZACION DEL PROGRAMA
 
 -------
