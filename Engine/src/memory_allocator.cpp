@@ -253,9 +253,7 @@ public:
         pPrevBlock->print();
 
         if ((*pIt)->getAddress() < pBlockToCoalesce->getAddress()) {
-          //++(*pIt);
           pBlockToCoalesce = &(*(*pIt));
-          //--(*pIt);
           uCurrentSize = pBlockToCoalesce->getSize();
           
           ++(*pIt);
@@ -270,10 +268,9 @@ public:
           pBlockToCoalesce->resize(pBlockToCoalesce->getSize() + 
             pPrevBlock->getSize(), nullptr, true);
           pBlockToCoalesce->print();
-          if (bChangedBlock == true) {
-            //--(*pIt);
-          }
+
           m_lBlocks.erase(*pIt);
+          
           bReturn = true;
           bCoalescePrevBlock = true;
         }
@@ -282,13 +279,14 @@ public:
         bCoalescePrevBlock = true;  // pIt points to list::begin
       }
 
-      if (bCoalescePrevBlock == true) {
-        ++(*pIt);
-      }
-      else {
-        ++(*pIt);
-      }
-      if (std::next(*pIt, 1) != m_lBlocks.end() && *pIt != m_lBlocks.end()) {
+      // if (bCoalescePrevBlock == true) {
+      //   ++(*pIt);
+      // }
+      // else {
+      //   ++(*pIt);
+      // }
+      ++(*pIt);
+      if (std::next(*pIt, 1) != m_lBlocks.end() && --(*pIt) != m_lBlocks.end()) {
         // new method
         Block* pBlockToCoalesce = &(*(*pIt));
         Block* pPrevBlock = nullptr;
@@ -298,7 +296,7 @@ public:
 
         const byte* uCurrentBlockAddress = pBlockToCoalesce->getAddress();
         
-        // check previous block (by ID)
+        // check next block (by ID)
         ++(*pIt);
         pPrevBlock = &(*(*pIt));
         uPrevSize = pPrevBlock->getSize();
