@@ -228,9 +228,16 @@ public:
     }
   }
 
-  // TODO: test with main coalesce function
+  enum IteratorCheckDirection {
+    Backward,
+    Forward
+  };
+
+  // TODO: test with main coalescing function
   // private:
-  bool checkAndCoalesce(std::list<Allocator::Block>::iterator* pIt, bool bCheckBackwards) {
+  bool checkAndCoalesce(std::list<Allocator::Block>::iterator* pIt, 
+    IteratorCheckDirection eCheckDirection) {
+    
     bool bReturn = false;
 
     Block* pBlockToCoalesce = &(*(*pIt));
@@ -239,7 +246,7 @@ public:
     uint64 uCurrentSize = pBlockToCoalesce->getSize();
     uint64 uPrevSize = 0;
     
-    if (bCheckBackwards == true) {
+    if (eCheckDirection == IteratorCheckDirection::Backward) {
       --(*pIt);
     }
     else {
@@ -256,7 +263,7 @@ public:
       pBlockToCoalesce = &(*(*pIt));
       uCurrentSize = pBlockToCoalesce->getSize();
       
-      if (bCheckBackwards == true) {
+      if (eCheckDirection == IteratorCheckDirection::Backward) {
         ++(*pIt);
       }
       else {
