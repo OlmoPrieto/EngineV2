@@ -24,5 +24,11 @@ V 0.0.1
         if the Allocator cannot retrieve one,
         do a coalesce pass and try to get a block again
 
+      TODO:
+        Allocator::releaseBlock()
+          a veces intenta eliminar un bloque de un pool que no es el correcto
+          coalescing
+          test en general
+          destructor allocator-blockpool
 
 -------

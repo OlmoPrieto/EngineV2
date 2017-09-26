@@ -28,34 +28,66 @@ public:
   }
 
   ~Allocator() {
+    printf("Num pools: %u\n", m_vBlocksPool.size());
+
     while (m_vBlocksPool.size() > 0) {
-      //m_vBlocksPool[m_vBlocksPool.size() - 1].releaseAllBlocks();
+      m_vBlocksPool[m_vBlocksPool.size() - 1].releaseAllBlocks();
       m_vBlocksPool.pop_back();
     }
   }
 
   byte* requestBlock(std::size_t uRequestedSize) {
-    if (m_pCurrentPool->getFreeMemory() >= uRequestedSize) {
-      return m_pCurrentPool->requestBlock(uRequestedSize);
-    }
-    else {
-      printf("AKLSGHJDKLJASHDLKJASHDKLASJHDASJKLSHDA\n");
-    }
+    bool bFoundPool = false;
+    if (m_pCurrentPool->getFreeMemory() < uRequestedSize) {
+      for (uint64 i = 0; i < m_vBlocksPool.size(); ++i) {
+        if (m_vBlocksPool[i].getFreeMemory() >= uRequestedSize) {
+          m_pCurrentPool = &m_vBlocksPool[i];
+          bFoundPool = true;
 
-    return nullptr;
+          break;
+        }
+      }
+
+      if (bFoundPool == false) {
+        printf("\nAdded another block pool\n");
+
+        std::size_t uSize = m_vBlocksPool[m_vBlocksPool.size() - 1].getMaxMemory() * 2;
+        m_vBlocksPool.emplace_back(uSize);
+        m_pCurrentPool = &m_vBlocksPool[m_vBlocksPool.size() - 1];
+      }
+    }
+    // else -> there is enough memory, so go on
+
+    return m_pCurrentPool->requestBlock(uRequestedSize);
   }
 
   // Try to optimize the function by limting the search sorted by pools
   void releaseBlock(byte* pAddress) {
-    const byte* bAddress = nullptr;
+    const byte* pPoolAddress = nullptr;
     uint64 uPoolSize = 0;
+    bool bBlockFound = false;
     for (uint64 i = 0; i < m_vBlocksPool.size(); ++i) {
-      bAddress = m_vBlocksPool[i].m_pBigFreeBlock->getAddress();
+      pPoolAddress = m_vBlocksPool[i].m_pBigFreeBlock->getAddress();
       uPoolSize = m_vBlocksPool[i].m_uMaxMemory;
-      if (pAddress >= bAddress && pAddress < bAddress + uPoolSize) {
-        m_vBlocksPool[i].releaseBlock(pAddress);
+      if (pPoolAddress <= pAddress && pAddress < pPoolAddress + uPoolSize) {
+        printf("Pool #%u\n", i);
+        bBlockFound = m_vBlocksPool[i].releaseBlock(pAddress);
+        printf("This printf is allowed\n");
+        //bBlockFound = true;
         // CAREFUL: will this always succeed?
         break;
+      }
+    }
+    
+    if (bBlockFound == false) {
+      printf("\n\nTHIS PRINTF ISNT ALLOWED\n\n");
+
+      for (uint64 i = 0; i < m_vBlocksPool.size(); ++i) {
+        if (m_vBlocksPool[i].releaseBlock(pAddress) == true) {
+          printf("FOUND!!\n");
+
+          break;
+        }
       }
     }
   }
@@ -159,7 +191,8 @@ private:
       m_pMemStart = (byte*)malloc(uMemoryAmount);
       printf("Starting address: \t%p\nMax address: \t\t%p\n", m_pMemStart, m_pMemStart + uMemoryAmount);
       if (m_pMemStart != nullptr) {
-        m_lBlocks.emplace_back(Block(m_pMemStart, uMemoryAmount, sm_uBlockCount, nullptr, true));
+        //m_lBlocks.emplace_back(Block(m_pMemStart, uMemoryAmount, sm_uBlockCount, nullptr, true));
+        m_lBlocks.emplace_back(m_pMemStart, uMemoryAmount, sm_uBlockCount, nullptr, true);
         ++sm_uBlockCount;
         m_pBigFreeBlock = &m_lBlocks.front();
         m_pFirstFreeBlock = &m_lBlocks.front();
@@ -174,19 +207,9 @@ private:
     }
 
     ~BlockPool() {
-      printAllElements();
+      printf("Destroying block pool\n");
 
-      while (getNumElements() > 2) {
-        auto it = m_lBlocks.begin();
-        coalesceBlocks(&it);
-      }
-      auto it = m_lBlocks.begin();
-      printf("sipote\n");
-      coalesceBlocks(&it);
-
-      printAllElements();
-
-      if (m_pMemStart != nullptr) {
+      if (m_uUsedMemory == 0 && m_pMemStart != nullptr && m_pFirstFreeBlock == nullptr) {
         free(m_pMemStart);
       }
     }
@@ -201,7 +224,7 @@ private:
         m_pFirstFreeBlock = m_pBigFreeBlock;
       #endif
 
-      if (m_pFirstFreeBlock == nullptr) {
+      if (m_pFirstFreeBlock == nullptr && m_pMemStart == nullptr) {
         // TODO: implement a system to alloc another big block of memory and manage this new big blocks
         printf("Not enough memory, returning malloc() address\t-> W: Allocator::requestBlock\n");
         return (byte*)malloc(uRequestedSize);
@@ -276,7 +299,7 @@ private:
     }
 
     // TODO: implement a version of everything with a std::vector and compare performance
-    void releaseBlock(byte* pAddress) {
+    bool releaseBlock(byte* pAddress) {
       printf("Trying to release block with address %p...\n", pAddress);
       auto it = m_lBlocks.begin();
       while (it != m_lBlocks.end()) {
@@ -286,30 +309,30 @@ private:
           printf("Releasing block %u with address: %p\n", it->getId(), pAddress);
 
           coalesceBlocks(&it);
-          //printf("&it is pointing to: ");
-          //it->print();
+          // printf("&it is pointing to: ");
+          // it->print();
 
-          break;
+          //break;
+          return true;
         }
         else {
           ++it;
         }
       }
+
+      return false;
     }
 
     void releaseAllBlocks() {
       auto it = m_lBlocks.begin();
 
-      while (it != m_lBlocks.end()) {
-        it->release();
-        m_uUsedMemory -= it->getSize();
-        coalesceBlocks(&it);
+      // while (m_lBlocks.size() > 1) {
+      //   coalesceBlocks(&it);
+      //   //it = m_lBlocks.begin();
+      // }
+      // m_lBlocks.size() == 1 -> true
 
-        ++it;
-      }
-
-      it = m_lBlocks.begin();
-      coalesceBlocks(&it);
+      m_pFirstFreeBlock = nullptr;
 
       printAllElements();
       printf("Released all blocks. Current memory: %u\n", m_uUsedMemory);
@@ -399,11 +422,12 @@ private:
           pPrevBlock->print();
 
           if ((*pIt)->getId() != 0) {
+            bool shit_changed = false;
             if ((*pIt)->getAddress() < pBlockToCoalesce->getAddress()) {
               pBlockToCoalesce = &(*(*pIt));
               uCurrentSize = pBlockToCoalesce->getSize();
               
-              ++(*pIt);
+              ++(*pIt); shit_changed = true;
               pPrevBlock = &(*(*pIt));
               uPrevSize = pPrevBlock->getSize();
             }
@@ -413,7 +437,7 @@ private:
               pBlockToCoalesce->resize(pBlockToCoalesce->getSize() + 
                 pPrevBlock->getSize(), nullptr, true);
               pBlockToCoalesce->print();
-
+              
               m_lBlocks.erase(*pIt);
               
               bReturn = true;
@@ -433,16 +457,19 @@ private:
               // pPrevBlock->print();
             //}
 
-            if (pPrevBlock->isFree() == true) {
-              printf("FIRST element free, coalescing\n");
-              pBlockToCoalesce->resize(pBlockToCoalesce->getSize() + 
-                pPrevBlock->getSize(), nullptr, true);
-              pBlockToCoalesce->print();
+              if (pPrevBlock->isFree() == true) {
+                printf("FIRST element free, coalescing\n");
+                pBlockToCoalesce->resize(pBlockToCoalesce->getSize() + 
+                  pPrevBlock->getSize(), nullptr, true);
+                pBlockToCoalesce->print();
 
-              m_lBlocks.erase(*pIt);
-              
-              bReturn = true;
-            }
+                //auto aux = --pIt;
+                //++pIt;
+                m_lBlocks.erase(*pIt);
+                //pIt = aux;
+                
+                bReturn = true;
+              }
             }
           }
         }
@@ -475,7 +502,10 @@ private:
           }
         }
 
-        ++(*pIt);
+        // CAREFUL: first thing to check if the program starts to crash again
+        // actually checking the NEXT block
+        //++(*pIt);
+        //(*(*(pIt))).print();
         if (++(*pIt) != m_lBlocks.end() && --(*pIt) != m_lBlocks.end()) {
           Block* pBlockToCoalesce = &(*(*pIt));
           Block* pPrevBlock = nullptr;
@@ -488,6 +518,7 @@ private:
           pPrevBlock = &(*(*pIt));
           uPrevSize = pPrevBlock->getSize();
 
+          printf("\nThis is the check for the next block:\n");
           pBlockToCoalesce->print();
           pPrevBlock->print();
 
@@ -515,7 +546,7 @@ private:
         printf("Elements after coalescing: ");
         printNumElements();
       }
-      else {  // if no iterator is supplied, coalesce all blocks in the Allocator
+      else {  // TODO: if no iterator is supplied, coalesce all blocks in the Allocator
         bReturn = false;
       }
 
@@ -578,12 +609,16 @@ private:
       return *it;
     }
 
+    const std::list<Allocator::Block>& getBlocks() const {
+      return m_lBlocks;
+    }
+
     std::size_t getFreeMemory() const {
       return  m_uMaxMemory - m_uUsedMemory;
     }
 
-    const std::list<Allocator::Block>& getBlocks() const {
-      return m_lBlocks;
+    uint64 getMaxMemory() const {
+      return m_uMaxMemory;
     }
 
     uint64 getUsedMemory() const {
@@ -623,7 +658,7 @@ private:
       return (void*)m_pBigFreeBlock->getAddress();
     }
 
-    static uint64 getBlockCount() const {
+    static uint64 getBlockCount() {
       return sm_uBlockCount;
     }
 
@@ -646,7 +681,7 @@ private:
 };  // Allocator
 
 uint64 Allocator::sm_uBlockCount = 0;
-Allocator cAlloc(64);
+Allocator cAlloc(16);
 
 // [ Managed Pointer ]
 template <class T>
