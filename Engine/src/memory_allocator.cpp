@@ -66,8 +66,11 @@ public:
     const byte* pPoolAddress = nullptr;
     uint64 uPoolSize = 0;
     bool bBlockFound = false;
+    printf("Given address: %p\n", pAddress);
     for (uint64 i = 0; i < m_vBlocksPool.size(); ++i) {
-      pPoolAddress = m_vBlocksPool[i].m_pBigFreeBlock->getAddress();
+      //pPoolAddress = m_vBlocksPool[i].m_pBigFreeBlock->getAddress();
+      pPoolAddress = m_vBlocksPool[i].m_lBlocks.begin()->getAddress();
+      printf("pPoolAddress: %p\n", pPoolAddress);
       uPoolSize = m_vBlocksPool[i].m_uMaxMemory;
       if (pPoolAddress <= pAddress && pAddress < pPoolAddress + uPoolSize) {
         printf("Pool #%u\n", i);
@@ -211,6 +214,8 @@ private:
 
       if (m_uUsedMemory == 0 && m_pMemStart != nullptr && m_pFirstFreeBlock == nullptr) {
         free(m_pMemStart);
+
+        printf("Memory correctly released\n");
       }
     }
 
@@ -326,10 +331,13 @@ private:
     void releaseAllBlocks() {
       auto it = m_lBlocks.begin();
 
-      // while (m_lBlocks.size() > 1) {
-      //   coalesceBlocks(&it);
-      //   //it = m_lBlocks.begin();
-      // }
+      do {
+        if (!coalesceBlocks(&it)) {
+          ++it;
+        }
+      } while (m_lBlocks.size() > 1);
+
+
       // m_lBlocks.size() == 1 -> true
 
       m_pFirstFreeBlock = nullptr;
@@ -708,9 +716,13 @@ public:
   }
 
   void release() {
-    m_pPtr->~T();
+    if (m_pPtr != nullptr) {
+      m_pPtr->~T();
 
-    cAlloc.releaseBlock((byte*)m_pPtr);
+      cAlloc.releaseBlock((byte*)m_pPtr);
+
+      m_pPtr = nullptr;
+    }
   }
 
   ~mptr() {
@@ -848,6 +860,8 @@ int main() {
   }
   
   printf("\n\nCompleted execution!\n\n");
+
+  cAlloc.printAllElements();
 
   return 0;
 }
