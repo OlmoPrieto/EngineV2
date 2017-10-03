@@ -292,7 +292,7 @@ private:
         m_pFirstFreeBlock->resize(uResizedMemAmount, nullptr, bUseCurrentBlock);
 
         cChrono.stop();
-        printf("\n\nTime to request block: %.2f\n\n", cChrono.timeAsMilliseconds());
+        printf("\n\nTime to request block: %.2fms\n\n", cChrono.timeAsMilliseconds());
 
         return pNewBlockAddress;
       }
@@ -306,6 +306,10 @@ private:
     // TODO: implement a version of everything with a std::vector and compare performance
     bool releaseBlock(byte* pAddress) {
       printf("Trying to release block with address %p...\n", pAddress);
+
+      Chrono cChrono;
+      cChrono.start();
+
       auto it = m_lBlocks.begin();
       while (it != m_lBlocks.end()) {
         if (pAddress == it->getAddress()) {//} && it->getId() != 0) {
@@ -318,12 +322,17 @@ private:
           // it->print();
 
           //break;
+          cChrono.stop();
+          printf("Time to release block: %.2fms\n", cChrono.timeAsMilliseconds());
           return true;
         }
         else {
           ++it;
         }
       }
+
+      cChrono.stop();
+      printf("Time to release block: %.2fms\n", cChrono.timeAsMilliseconds());
 
       return false;
     }
@@ -429,30 +438,24 @@ private:
           pBlockToCoalesce->print();
           pPrevBlock->print();
 
+          // (*pIt) points to the previous element, pPrevBlock
+          
+          // TODO: look at this for optimization, maybe this distinction is not needed
           if ((*pIt)->getId() != 0) {
-            bool shit_changed = false;
+            // normal case, a block in between the pool
             if ((*pIt)->getAddress() < pBlockToCoalesce->getAddress()) {
               pBlockToCoalesce = &(*(*pIt));
               uCurrentSize = pBlockToCoalesce->getSize();
               
-              ++(*pIt); shit_changed = true;
+              ++(*pIt);
               pPrevBlock = &(*(*pIt));
               uPrevSize = pPrevBlock->getSize();
-            }
-
-            if (pPrevBlock->isFree() == true) {
-              printf("Prev element free, coalescing\n");
-              pBlockToCoalesce->resize(pBlockToCoalesce->getSize() + 
-                pPrevBlock->getSize(), nullptr, true);
-              pBlockToCoalesce->print();
-              
-              m_lBlocks.erase(*pIt);
-              
-              bReturn = true;
             }
           }
           else {
             // if the previous block is the first block (ID == 0)
+            // is this check needed? maybe always change the block to coalesce
+            // to the first one (ID == 0)
             if ((*pIt)->getAddress() + (*pIt)->getSize() == pBlockToCoalesce->getAddress()) {
               pBlockToCoalesce = &(*(*pIt));
               uCurrentSize = pBlockToCoalesce->getSize();
@@ -460,60 +463,63 @@ private:
               ++(*pIt);
               pPrevBlock = &(*(*pIt));
               uPrevSize = pPrevBlock->getSize();
-
-              // pBlockToCoalesce->print();
-              // pPrevBlock->print();
-            //}
-
-              if (pPrevBlock->isFree() == true) {
-                printf("FIRST element free, coalescing\n");
-                pBlockToCoalesce->resize(pBlockToCoalesce->getSize() + 
-                  pPrevBlock->getSize(), nullptr, true);
-                pBlockToCoalesce->print();
-
-                //auto aux = --pIt;
-                //++pIt;
-                m_lBlocks.erase(*pIt);
-                //pIt = aux;
-                
-                bReturn = true;
-              }
             }
+          }
+
+          if (pPrevBlock->isFree() == true) {
+            printf("FIRST element free, coalescing\n");
+            pBlockToCoalesce->resize(pBlockToCoalesce->getSize() + 
+              pPrevBlock->getSize(), nullptr, true);
+            pBlockToCoalesce->print();
+
+            auto aux = --(*pIt);
+            ++(*pIt);
+            m_lBlocks.erase(*pIt);
+            *pIt = aux;
+            
+            bReturn = true;
           }
         }
         else {
           // pIt points to list::begin
 
-          Block* pBlockToCoalesce = &(*(*pIt));
-          Block* pPrevBlock = nullptr;
+          if (m_lBlocks.size() > 1) {
+            Block* pBlockToCoalesce = &(*(*pIt));
+            Block* pPrevBlock = nullptr;
 
-          uint64 uCurrentSize = pBlockToCoalesce->getSize();
-          uint64 uPrevSize = 0;
-          
-          // check next block (by ID)
-          ++(*pIt);
-          pPrevBlock = &(*(*pIt));
-          uPrevSize = pPrevBlock->getSize();
+            uint64 uCurrentSize = pBlockToCoalesce->getSize();
+            uint64 uPrevSize = 0;
+            
+            // check next block (by ID)
+            ++(*pIt);
+            pPrevBlock = &(*(*pIt));
+            uPrevSize = pPrevBlock->getSize();
 
-          pBlockToCoalesce->print();
-          pPrevBlock->print();
-
-          if (pPrevBlock->isFree() == true) {
-            printf("Next element free (only two remaining), coalescing\n");
-            pBlockToCoalesce->resize(pBlockToCoalesce->getSize() + 
-              pPrevBlock->getSize(), nullptr, true);
             pBlockToCoalesce->print();
+            pPrevBlock->print();
 
-            m_lBlocks.erase(*pIt);
+            // most probably, pBlockToCoalesce will point to the first block (ID == 0)
+            // (*pIt) and pPrevBlock will point to the next element
+            if (pPrevBlock->isFree() == true) {
+              printf("Next element free (only two remaining), coalescing\n");
+              pBlockToCoalesce->resize(pBlockToCoalesce->getSize() + 
+                pPrevBlock->getSize(), nullptr, true);
+              pBlockToCoalesce->print();
 
-            bReturn = true;
+              auto aux = --(*pIt);
+              ++(*pIt);
+              m_lBlocks.erase(*pIt);
+              *pIt = aux;
+
+              bReturn = true;
+            }
           }
         }
 
         // CAREFUL: first thing to check if the program starts to crash again
-        // actually checking the NEXT block
-        //++(*pIt);
-        //(*(*(pIt))).print();
+        // ++(*pIt) shouldn't crash because it will always point to at least the last element
+
+        // check the NEXT block            // maybe not needed, delete!
         if (++(*pIt) != m_lBlocks.end() && --(*pIt) != m_lBlocks.end()) {
           Block* pBlockToCoalesce = &(*(*pIt));
           Block* pPrevBlock = nullptr;
@@ -545,7 +551,10 @@ private:
               pPrevBlock->getSize(), nullptr, true);
             pBlockToCoalesce->print();
 
+            auto aux = --(*pIt);
+            ++(*pIt);
             m_lBlocks.erase(*pIt);
+            *pIt = aux;
 
             bReturn = true;
           }
