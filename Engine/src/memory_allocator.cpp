@@ -4,8 +4,6 @@
 #include <list>
 #include <vector>
 
-//#include <cstdio>
-
 #include "chrono.h"
 
 #include <Windows.h>
