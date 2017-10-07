@@ -4,6 +4,8 @@
 #include <list>
 #include <vector>
 
+//#include <cstdio>
+
 #include "chrono.h"
 
 #include <Windows.h>
@@ -36,6 +38,8 @@ public:
       m_vBlocksPool[m_vBlocksPool.size() - 1].releaseAllBlocks();
       m_vBlocksPool.pop_back();
     }
+
+    printf("Destroyed allocator\n");
   }
 
   byte* requestBlock(std::size_t uRequestedSize) {
@@ -344,7 +348,9 @@ private:
 
       do {
         if (!coalesceBlocks(&it)) {
-          ++it;
+          if (it != m_lBlocks.end()) {
+            ++it;
+          }
         }
       } while (m_lBlocks.size() > 1);
 
@@ -694,7 +700,7 @@ private:
 
   // Allocator variables
   std::vector<BlockPool> m_vBlocksPool;
-  BlockPool* m_pCurrentPool = &m_vBlocksPool[0];
+  BlockPool* m_pCurrentPool = nullptr;
   static uint64 sm_uBlockCount;
 
 };  // Allocator
