@@ -5,6 +5,8 @@
 
 #include "chrono.h"
 
+#include <Windows.h>
+
 #define USE_FIRST_BIG_BLOCK 1
 #define ALLOC_POLICY_BEST_FIT 1
 #define ALLOC_POLICY_SPLIT_BIG_BLOCK (ALLOC_POLICY_BEST_FIT == 0)
@@ -113,9 +115,11 @@ public:
     }
     auto it = m_lBlocks.begin();
     printf("sipote\n");
-    coalesceBlocks(&it);
-
+    //coalesceBlocks(&it);
+    char buffer[1024];
+    snprintf(buffer, 1024, "%u", getNumElements());
     printAllElements();
+    OutputDebugString(std::string(buffer).c_str());
 
     if (m_pMemStart != nullptr) {
       free(m_pMemStart);
@@ -327,7 +331,11 @@ public:
               pPrevBlock->getSize(), nullptr, true);
             pBlockToCoalesce->print();
 
+            //m_lBlocks.erase(*pIt);
+            auto aux = --(*pIt);
+            ++(*pIt);
             m_lBlocks.erase(*pIt);
+            *pIt = aux;
             
             bReturn = true;
           }
@@ -352,7 +360,11 @@ public:
               pPrevBlock->getSize(), nullptr, true);
             pBlockToCoalesce->print();
 
+            //m_lBlocks.erase(*pIt);
+            auto aux = --(*pIt);
+            ++(*pIt);
             m_lBlocks.erase(*pIt);
+            *pIt = aux;
             
             bReturn = true;
           }
@@ -382,12 +394,16 @@ public:
             pPrevBlock->getSize(), nullptr, true);
           pBlockToCoalesce->print();
 
+          auto aux = --(*pIt);
+          ++(*pIt);
           m_lBlocks.erase(*pIt);
+          *pIt = aux;
 
           bReturn = true;
         }
       }
 
+      // TODO: when erasing a block, std::list in windows seems to not behave like the standard, so you have to make the thing above when releasing
       ++(*pIt);
       if (++(*pIt) != m_lBlocks.end() && --(*pIt) != m_lBlocks.end()) {
         Block* pBlockToCoalesce = &(*(*pIt));
@@ -548,7 +564,7 @@ private:
 };
 
 uint64 Allocator::sm_uBlockCount = 0;
-Allocator cAlloc(64);
+Allocator cAlloc(1024);
 
 // [ Managed Pointer ]
 template <class T>
@@ -715,6 +731,8 @@ int main() {
   }
   
   printf("\n\nCompleted execution!\n\n");
+
+  getchar();
 
   return 0;
 }
