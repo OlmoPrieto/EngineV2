@@ -60,6 +60,8 @@ solution "Engine"
             --"./Engine/dependencies/GLFW/include/GLFW/glfw3.h"
          }
          defines { "_GLFW_WIN32", "_GLFW_WGL", "_GLFW_USE_OPENGL" }
+         buildoptions_cpp("/Y-")
+         windowstargetplatformversion "10.0.15063.0"
          
        configuration { "macosx" }
          links  {

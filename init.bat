@@ -1,0 +1,1 @@
+genie.exe --file=project_settings.lua --os=windows vs2017
