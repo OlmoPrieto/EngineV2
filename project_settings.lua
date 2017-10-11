@@ -21,6 +21,8 @@ solution "Engine"
       includedirs { 
            "./Engine/include", 
            "./Engine/dependencies",
+           "./Engine/dependencies/glew/include/",
+           "./Engine/dependencies/GLFW/deps/",
       }
       
       -- INCLUDE FILES
