@@ -6,8 +6,6 @@
 
 #include "chrono.h"
 
-#include <Windows.h>
-
 #define USE_FIRST_BIG_BLOCK 1
 #define ALLOC_POLICY_BEST_FIT 1
 #define ALLOC_POLICY_SPLIT_BIG_BLOCK (ALLOC_POLICY_BEST_FIT == 0)

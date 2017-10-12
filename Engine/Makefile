@@ -46,8 +46,8 @@ ifeq ($(config),debug)
   OBJDIR              = obj/Debug
   TARGETDIR           = bin
   TARGET              = $(TARGETDIR)/Engine
-  DEFINES            += -D_GLFW_X11 -D_GLFW_GLX -D_GLFW_USE_OPENGL -DDEBUG
-  INCLUDES           += -Iinclude -Idependencies
+  DEFINES            += -D_GLFW_X11 -D_GLFW_HAS_GLXGETPROCADDRESS -D_GLFW_GLX -D_GLFW_USE_OPENGL -DDEBUG
+  INCLUDES           += -Iinclude -Idependencies -Idependencies/glew/include -Idependencies/GLFW/deps
   INCLUDES           +=
   ALL_CPPFLAGS       += $(CPPFLAGS) -MMD -MP -MP $(DEFINES) $(INCLUDES)
   ALL_CFLAGS         += $(CFLAGS) $(ALL_CPPFLAGS) $(ARCH) -g -Wall -Wextra
@@ -55,9 +55,9 @@ ifeq ($(config),debug)
   ALL_OBJCFLAGS      += $(CFLAGS) $(ALL_CPPFLAGS) $(ARCH) -g -Wall -Wextra
   ALL_OBJCPPFLAGS    += $(CXXFLAGS) $(CFLAGS) $(ALL_CPPFLAGS) $(ARCH) -g -Wall -Wextra -std=c++11
   ALL_RESFLAGS       += $(RESFLAGS) $(DEFINES) $(INCLUDES)
-  ALL_LDFLAGS        += $(LDFLAGS)
+  ALL_LDFLAGS        += $(LDFLAGS) -L.
   LDDEPS             +=
-  LIBS               += $(LDDEPS)
+  LIBS               += $(LDDEPS) -lX11 -lXrandr -lXcursor -lXinerama -lXi -lXxf86vm -lrt -lpthread -lGL -lm
   EXTERNAL_LIBS      +=
   LINKCMD             = $(CXX) -o $(TARGET) $(OBJECTS) $(RESOURCES) $(ARCH) $(ALL_LDFLAGS) $(LIBS)
   OBJECTS := \
@@ -73,6 +73,7 @@ ifeq ($(config),debug)
 	$(OBJDIR)/dependencies/GLFW/src/x11_init.o \
 	$(OBJDIR)/dependencies/GLFW/src/x11_monitor.o \
 	$(OBJDIR)/dependencies/GLFW/src/x11_window.o \
+	$(OBJDIR)/dependencies/GLFW/src/xkb_unicode.o \
 	$(OBJDIR)/dependencies/glew/include/glew.o \
 	$(OBJDIR)/src/memory_allocator.o \
 
@@ -88,8 +89,8 @@ ifeq ($(config),release)
   OBJDIR              = obj/Release
   TARGETDIR           = bin
   TARGET              = $(TARGETDIR)/Engine
-  DEFINES            += -D_GLFW_X11 -D_GLFW_GLX -D_GLFW_USE_OPENGL -DNDEBUG
-  INCLUDES           += -Iinclude -Idependencies
+  DEFINES            += -D_GLFW_X11 -D_GLFW_HAS_GLXGETPROCADDRESS -D_GLFW_GLX -D_GLFW_USE_OPENGL -DNDEBUG
+  INCLUDES           += -Iinclude -Idependencies -Idependencies/glew/include -Idependencies/GLFW/deps
   INCLUDES           +=
   ALL_CPPFLAGS       += $(CPPFLAGS) -MMD -MP -MP $(DEFINES) $(INCLUDES)
   ALL_CFLAGS         += $(CFLAGS) $(ALL_CPPFLAGS) $(ARCH) -O2 -Wall -Wextra
@@ -97,9 +98,9 @@ ifeq ($(config),release)
   ALL_OBJCFLAGS      += $(CFLAGS) $(ALL_CPPFLAGS) $(ARCH) -O2 -Wall -Wextra
   ALL_OBJCPPFLAGS    += $(CXXFLAGS) $(CFLAGS) $(ALL_CPPFLAGS) $(ARCH) -O2 -Wall -Wextra -std=c++11
   ALL_RESFLAGS       += $(RESFLAGS) $(DEFINES) $(INCLUDES)
-  ALL_LDFLAGS        += $(LDFLAGS) -s
+  ALL_LDFLAGS        += $(LDFLAGS) -L. -s
   LDDEPS             +=
-  LIBS               += $(LDDEPS)
+  LIBS               += $(LDDEPS) -lX11 -lXrandr -lXcursor -lXinerama -lXi -lXxf86vm -lrt -lpthread -lGL -lm
   EXTERNAL_LIBS      +=
   LINKCMD             = $(CXX) -o $(TARGET) $(OBJECTS) $(RESOURCES) $(ARCH) $(ALL_LDFLAGS) $(LIBS)
   OBJECTS := \
@@ -115,6 +116,7 @@ ifeq ($(config),release)
 	$(OBJDIR)/dependencies/GLFW/src/x11_init.o \
 	$(OBJDIR)/dependencies/GLFW/src/x11_monitor.o \
 	$(OBJDIR)/dependencies/GLFW/src/x11_window.o \
+	$(OBJDIR)/dependencies/GLFW/src/xkb_unicode.o \
 	$(OBJDIR)/dependencies/glew/include/glew.o \
 	$(OBJDIR)/src/memory_allocator.o \
 
@@ -130,8 +132,8 @@ ifeq ($(config),debug64)
   OBJDIR              = obj/x64/Debug
   TARGETDIR           = bin
   TARGET              = $(TARGETDIR)/Engine
-  DEFINES            += -D_GLFW_X11 -D_GLFW_GLX -D_GLFW_USE_OPENGL -DDEBUG
-  INCLUDES           += -Iinclude -Idependencies
+  DEFINES            += -D_GLFW_X11 -D_GLFW_HAS_GLXGETPROCADDRESS -D_GLFW_GLX -D_GLFW_USE_OPENGL -DDEBUG
+  INCLUDES           += -Iinclude -Idependencies -Idependencies/glew/include -Idependencies/GLFW/deps
   INCLUDES           +=
   ALL_CPPFLAGS       += $(CPPFLAGS) -MMD -MP -MP $(DEFINES) $(INCLUDES)
   ALL_CFLAGS         += $(CFLAGS) $(ALL_CPPFLAGS) $(ARCH) -g -Wall -Wextra -m64
@@ -139,9 +141,9 @@ ifeq ($(config),debug64)
   ALL_OBJCFLAGS      += $(CFLAGS) $(ALL_CPPFLAGS) $(ARCH) -g -Wall -Wextra -m64
   ALL_OBJCPPFLAGS    += $(CXXFLAGS) $(CFLAGS) $(ALL_CPPFLAGS) $(ARCH) -g -Wall -Wextra -m64 -std=c++11
   ALL_RESFLAGS       += $(RESFLAGS) $(DEFINES) $(INCLUDES)
-  ALL_LDFLAGS        += $(LDFLAGS) -m64
+  ALL_LDFLAGS        += $(LDFLAGS) -L. -m64
   LDDEPS             +=
-  LIBS               += $(LDDEPS)
+  LIBS               += $(LDDEPS) -lX11 -lXrandr -lXcursor -lXinerama -lXi -lXxf86vm -lrt -lpthread -lGL -lm
   EXTERNAL_LIBS      +=
   LINKCMD             = $(CXX) -o $(TARGET) $(OBJECTS) $(RESOURCES) $(ARCH) $(ALL_LDFLAGS) $(LIBS)
   OBJECTS := \
@@ -157,6 +159,7 @@ ifeq ($(config),debug64)
 	$(OBJDIR)/dependencies/GLFW/src/x11_init.o \
 	$(OBJDIR)/dependencies/GLFW/src/x11_monitor.o \
 	$(OBJDIR)/dependencies/GLFW/src/x11_window.o \
+	$(OBJDIR)/dependencies/GLFW/src/xkb_unicode.o \
 	$(OBJDIR)/dependencies/glew/include/glew.o \
 	$(OBJDIR)/src/memory_allocator.o \
 
@@ -172,8 +175,8 @@ ifeq ($(config),release64)
   OBJDIR              = obj/x64/Release
   TARGETDIR           = bin
   TARGET              = $(TARGETDIR)/Engine
-  DEFINES            += -D_GLFW_X11 -D_GLFW_GLX -D_GLFW_USE_OPENGL -DNDEBUG
-  INCLUDES           += -Iinclude -Idependencies
+  DEFINES            += -D_GLFW_X11 -D_GLFW_HAS_GLXGETPROCADDRESS -D_GLFW_GLX -D_GLFW_USE_OPENGL -DNDEBUG
+  INCLUDES           += -Iinclude -Idependencies -Idependencies/glew/include -Idependencies/GLFW/deps
   INCLUDES           +=
   ALL_CPPFLAGS       += $(CPPFLAGS) -MMD -MP -MP $(DEFINES) $(INCLUDES)
   ALL_CFLAGS         += $(CFLAGS) $(ALL_CPPFLAGS) $(ARCH) -O2 -Wall -Wextra -m64
@@ -181,9 +184,9 @@ ifeq ($(config),release64)
   ALL_OBJCFLAGS      += $(CFLAGS) $(ALL_CPPFLAGS) $(ARCH) -O2 -Wall -Wextra -m64
   ALL_OBJCPPFLAGS    += $(CXXFLAGS) $(CFLAGS) $(ALL_CPPFLAGS) $(ARCH) -O2 -Wall -Wextra -m64 -std=c++11
   ALL_RESFLAGS       += $(RESFLAGS) $(DEFINES) $(INCLUDES)
-  ALL_LDFLAGS        += $(LDFLAGS) -s -m64
+  ALL_LDFLAGS        += $(LDFLAGS) -L. -s -m64
   LDDEPS             +=
-  LIBS               += $(LDDEPS)
+  LIBS               += $(LDDEPS) -lX11 -lXrandr -lXcursor -lXinerama -lXi -lXxf86vm -lrt -lpthread -lGL -lm
   EXTERNAL_LIBS      +=
   LINKCMD             = $(CXX) -o $(TARGET) $(OBJECTS) $(RESOURCES) $(ARCH) $(ALL_LDFLAGS) $(LIBS)
   OBJECTS := \
@@ -199,6 +202,7 @@ ifeq ($(config),release64)
 	$(OBJDIR)/dependencies/GLFW/src/x11_init.o \
 	$(OBJDIR)/dependencies/GLFW/src/x11_monitor.o \
 	$(OBJDIR)/dependencies/GLFW/src/x11_window.o \
+	$(OBJDIR)/dependencies/GLFW/src/xkb_unicode.o \
 	$(OBJDIR)/dependencies/glew/include/glew.o \
 	$(OBJDIR)/src/memory_allocator.o \
 
@@ -214,8 +218,8 @@ ifeq ($(config),debug32)
   OBJDIR              = obj/x32/Debug
   TARGETDIR           = bin
   TARGET              = $(TARGETDIR)/Engine
-  DEFINES            += -D_GLFW_X11 -D_GLFW_GLX -D_GLFW_USE_OPENGL -DDEBUG
-  INCLUDES           += -Iinclude -Idependencies
+  DEFINES            += -D_GLFW_X11 -D_GLFW_HAS_GLXGETPROCADDRESS -D_GLFW_GLX -D_GLFW_USE_OPENGL -DDEBUG
+  INCLUDES           += -Iinclude -Idependencies -Idependencies/glew/include -Idependencies/GLFW/deps
   INCLUDES           +=
   ALL_CPPFLAGS       += $(CPPFLAGS) -MMD -MP -MP $(DEFINES) $(INCLUDES)
   ALL_CFLAGS         += $(CFLAGS) $(ALL_CPPFLAGS) $(ARCH) -g -Wall -Wextra -m32
@@ -223,9 +227,9 @@ ifeq ($(config),debug32)
   ALL_OBJCFLAGS      += $(CFLAGS) $(ALL_CPPFLAGS) $(ARCH) -g -Wall -Wextra -m32
   ALL_OBJCPPFLAGS    += $(CXXFLAGS) $(CFLAGS) $(ALL_CPPFLAGS) $(ARCH) -g -Wall -Wextra -m32 -std=c++11
   ALL_RESFLAGS       += $(RESFLAGS) $(DEFINES) $(INCLUDES)
-  ALL_LDFLAGS        += $(LDFLAGS) -m32
+  ALL_LDFLAGS        += $(LDFLAGS) -L. -m32
   LDDEPS             +=
-  LIBS               += $(LDDEPS)
+  LIBS               += $(LDDEPS) -lX11 -lXrandr -lXcursor -lXinerama -lXi -lXxf86vm -lrt -lpthread -lGL -lm
   EXTERNAL_LIBS      +=
   LINKCMD             = $(CXX) -o $(TARGET) $(OBJECTS) $(RESOURCES) $(ARCH) $(ALL_LDFLAGS) $(LIBS)
   OBJECTS := \
@@ -241,6 +245,7 @@ ifeq ($(config),debug32)
 	$(OBJDIR)/dependencies/GLFW/src/x11_init.o \
 	$(OBJDIR)/dependencies/GLFW/src/x11_monitor.o \
 	$(OBJDIR)/dependencies/GLFW/src/x11_window.o \
+	$(OBJDIR)/dependencies/GLFW/src/xkb_unicode.o \
 	$(OBJDIR)/dependencies/glew/include/glew.o \
 	$(OBJDIR)/src/memory_allocator.o \
 
@@ -256,8 +261,8 @@ ifeq ($(config),release32)
   OBJDIR              = obj/x32/Release
   TARGETDIR           = bin
   TARGET              = $(TARGETDIR)/Engine
-  DEFINES            += -D_GLFW_X11 -D_GLFW_GLX -D_GLFW_USE_OPENGL -DNDEBUG
-  INCLUDES           += -Iinclude -Idependencies
+  DEFINES            += -D_GLFW_X11 -D_GLFW_HAS_GLXGETPROCADDRESS -D_GLFW_GLX -D_GLFW_USE_OPENGL -DNDEBUG
+  INCLUDES           += -Iinclude -Idependencies -Idependencies/glew/include -Idependencies/GLFW/deps
   INCLUDES           +=
   ALL_CPPFLAGS       += $(CPPFLAGS) -MMD -MP -MP $(DEFINES) $(INCLUDES)
   ALL_CFLAGS         += $(CFLAGS) $(ALL_CPPFLAGS) $(ARCH) -O2 -Wall -Wextra -m32
@@ -265,9 +270,9 @@ ifeq ($(config),release32)
   ALL_OBJCFLAGS      += $(CFLAGS) $(ALL_CPPFLAGS) $(ARCH) -O2 -Wall -Wextra -m32
   ALL_OBJCPPFLAGS    += $(CXXFLAGS) $(CFLAGS) $(ALL_CPPFLAGS) $(ARCH) -O2 -Wall -Wextra -m32 -std=c++11
   ALL_RESFLAGS       += $(RESFLAGS) $(DEFINES) $(INCLUDES)
-  ALL_LDFLAGS        += $(LDFLAGS) -s -m32
+  ALL_LDFLAGS        += $(LDFLAGS) -L. -s -m32
   LDDEPS             +=
-  LIBS               += $(LDDEPS)
+  LIBS               += $(LDDEPS) -lX11 -lXrandr -lXcursor -lXinerama -lXi -lXxf86vm -lrt -lpthread -lGL -lm
   EXTERNAL_LIBS      +=
   LINKCMD             = $(CXX) -o $(TARGET) $(OBJECTS) $(RESOURCES) $(ARCH) $(ALL_LDFLAGS) $(LIBS)
   OBJECTS := \
@@ -283,6 +288,7 @@ ifeq ($(config),release32)
 	$(OBJDIR)/dependencies/GLFW/src/x11_init.o \
 	$(OBJDIR)/dependencies/GLFW/src/x11_monitor.o \
 	$(OBJDIR)/dependencies/GLFW/src/x11_window.o \
+	$(OBJDIR)/dependencies/GLFW/src/xkb_unicode.o \
 	$(OBJDIR)/dependencies/glew/include/glew.o \
 	$(OBJDIR)/src/memory_allocator.o \
 
@@ -443,6 +449,10 @@ $(OBJDIR)/dependencies/GLFW/src/x11_monitor.o: dependencies/GLFW/src/x11_monitor
 	$(SILENT) $(CC) $(ALL_CFLAGS) $(FORCE_INCLUDE) -o "$@" -c "$<"
 
 $(OBJDIR)/dependencies/GLFW/src/x11_window.o: dependencies/GLFW/src/x11_window.c $(GCH) $(MAKEFILE)
+	@echo $(notdir $<)
+	$(SILENT) $(CC) $(ALL_CFLAGS) $(FORCE_INCLUDE) -o "$@" -c "$<"
+
+$(OBJDIR)/dependencies/GLFW/src/xkb_unicode.o: dependencies/GLFW/src/xkb_unicode.c $(GCH) $(MAKEFILE)
 	@echo $(notdir $<)
 	$(SILENT) $(CC) $(ALL_CFLAGS) $(FORCE_INCLUDE) -o "$@" -c "$<"
 
