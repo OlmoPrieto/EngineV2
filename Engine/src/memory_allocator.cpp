@@ -16,6 +16,11 @@ typedef int int64;
 
 Chrono cChrono;
 
+float average_request = 0.0f;
+uint64 times_request = 0;
+float average_free = 0.0f;
+uint64 times_free = 0;
+
 class Allocator {
 private:
   class Block;
@@ -225,43 +230,35 @@ private:
 
       cChrono.start();
 
-      #if (ALLOC_POLICY_BEST_FIT == 1)
-        m_pFirstFreeBlock = findFirstFreeBlock(uRequestedSize);
-      #elif (ALLOC_POLICY_SPLIT_BIG_BLOCK == 1)
-        m_pFirstFreeBlock = m_pBigFreeBlock;
-      #endif
-
-      if (m_pFirstFreeBlock == nullptr && m_pMemStart == nullptr) {
-        // TODO: implement a system to alloc another big block of memory and manage this new big blocks
-        printf("Not enough memory, returning malloc() address\t-> W: Allocator::requestBlock\n");
-        return (byte*)malloc(uRequestedSize);
-      }
-
-      byte* pNewBlockAddress = (byte*)(m_pFirstFreeBlock->getAddress());
-      uint64 uFirstFreeBlockSize = m_pFirstFreeBlock->getSize();
+      byte* pNewBlockAddress = nullptr;
+      uint64 uFirstFreeBlockSize = 0;
       uint64 uResizedMemAmount = uFirstFreeBlockSize;
       bool bUseCurrentBlock = true;
 
-      if (uFirstFreeBlockSize < uRequestedSize || m_pFirstFreeBlock->isFree() == false) {
-
-        uint64 loops = 0;
-        do {
+      uint64 loops = 0;
+      do {
+        #if (ALLOC_POLICY_BEST_FIT == 1)
           m_pFirstFreeBlock = findFirstFreeBlock(uRequestedSize);
-          uFirstFreeBlockSize = m_pFirstFreeBlock->getSize();
+        #elif (ALLOC_POLICY_SPLIT_BIG_BLOCK == 1)
+          m_pFirstFreeBlock = m_pBigFreeBlock;
+        #endif
 
-          loops++;
-          if (loops > 1000) {
-            m_pFirstFreeBlock = nullptr;
+        pNewBlockAddress = (byte*)(m_pFirstFreeBlock->getAddress());
+        uFirstFreeBlockSize = m_pFirstFreeBlock->getSize();
+        uResizedMemAmount = uFirstFreeBlockSize;
 
-            break;
-          }
-        } while (uFirstFreeBlockSize < uRequestedSize);
+        ++loops;
+        if (loops > 1000) {
+          m_pFirstFreeBlock = nullptr;
 
-        if (m_pFirstFreeBlock == nullptr) {
-          // TODO: implement a system to alloc another big block of memory and manage this new big blocks
-          printf("Not enough memory, returning malloc() address\t-> W: Allocator::requestBlock\n");
-          return (byte*)malloc(uRequestedSize);
+          break;
         }
+      } while (uFirstFreeBlockSize < uRequestedSize || m_pFirstFreeBlock->isFree() == false);
+
+      if (m_pFirstFreeBlock == nullptr) {
+        // TODO: implement a system to alloc another big block of memory and manage this new big blocks
+        printf("Not enough memory, returning malloc() address\t-> W: Allocator::requestBlock\n");
+        return (byte*)malloc(uRequestedSize);
       }
 
       if (uFirstFreeBlockSize >= uRequestedSize) {
@@ -288,13 +285,15 @@ private:
           bUseCurrentBlock = false;
           m_uUsedMemory += uRequestedSize;
         }
-        if (m_pFirstFreeBlock->getId() == 0) {
-          printf("Splitting block 0!\n");
+        if (m_pFirstFreeBlock->getAddress() == m_pBigFreeBlock->getAddress()) {
+          printf("Splitting FIRST block!\n");
         }
         m_pFirstFreeBlock->resize(uResizedMemAmount, nullptr, bUseCurrentBlock);
 
         cChrono.stop();
-        printf("\n\nTime to request block: %.2fms\n\n", cChrono.timeAsMilliseconds());
+        printf("\n\nTime to request block: %.3fms\n\n", cChrono.timeAsMilliseconds());
+        average_request += cChrono.timeAsMilliseconds();
+        ++times_request;
 
         return pNewBlockAddress;
       }
@@ -325,7 +324,9 @@ private:
 
           //break;
           cChrono.stop();
-          printf("Time to release block: %.2fms\n", cChrono.timeAsMilliseconds());
+          printf("Time to release block: %.3fms\n", cChrono.timeAsMilliseconds());
+          average_free += cChrono.timeAsMilliseconds();
+          ++times_free;
           return true;
         }
         else {
@@ -334,7 +335,9 @@ private:
       }
 
       cChrono.stop();
-      printf("Time to release block: %.2fms\n", cChrono.timeAsMilliseconds());
+      printf("Time to release block: %.3fms\n", cChrono.timeAsMilliseconds());
+      average_free += cChrono.timeAsMilliseconds();
+      ++times_free;
 
       return false;
     }
@@ -875,6 +878,11 @@ int main() {
   printf("\n\nCompleted execution!\n\n");
 
   cAlloc.printAllElements();
+
+  printf("\n");
+  printf("Average time for request block: %.3f\n", (average_request / (float)times_request));
+  printf("Average time for free    block: %.3f\n", (average_free / (float)times_free));
+  printf("\n");
 
   return 0;
 }
