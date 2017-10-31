@@ -21,14 +21,33 @@ uint64 times_request = 0;
 float average_free = 0.0f;
 uint64 times_free = 0;
 
+static inline bool isAddressAligned(void* pAddress, byte byAlignment) {
+  return (((unsigned long)(pAddress) % (byAlignment)) == 0);
+}
+
 class Allocator {
 private:
   class Block;
   class BlockPool;
 public:
 
-  Allocator(std::size_t uRequestedSize) {
-    m_vBlocksPool.emplace_back(uRequestedSize);
+  Allocator(uint64 uRequestedSize, byte byAlignment = 1) {
+    m_byAlignment = byAlignment;
+
+    printf("Creating allocator...\n");
+    printf("Requested: %u bytes\n", uRequestedSize);
+
+    // TODO: do this in a separate and private function!!
+    if (uRequestedSize % 2 != 0) {
+      ++uRequestedSize;
+    }
+    while (uRequestedSize % m_byAlignment != 0) {
+      uRequestedSize += 2;
+    }
+
+    printf("Given %u bytes\n", uRequestedSize);
+
+    m_vBlocksPool.emplace_back(uRequestedSize, m_byAlignment);
     m_pCurrentPool = &m_vBlocksPool[0];
   }
 
@@ -43,7 +62,7 @@ public:
     printf("Destroyed allocator\n");
   }
 
-  byte* requestBlock(std::size_t uRequestedSize) {
+  byte* requestBlock(uint64 uRequestedSize) {
     bool bFoundPool = false;
     if (m_pCurrentPool->getFreeMemory() < uRequestedSize) {
       for (uint64 i = 0; i < m_vBlocksPool.size(); ++i) {
@@ -58,8 +77,21 @@ public:
       if (bFoundPool == false) {
         printf("\nAdded another block pool\n");
 
-        std::size_t uSize = m_vBlocksPool[m_vBlocksPool.size() - 1].getMaxMemory() * 2;
-        m_vBlocksPool.emplace_back(uSize);
+        uint64 uSize = m_vBlocksPool[m_vBlocksPool.size() - 1].getMaxMemory() * 2;
+
+        printf("Requested %u bytes\n", uSize);
+
+        // TODO: do this in a separate and private function!!
+        if (uSize % 2 != 0) {
+          ++uSize;
+        }
+        while (uSize % m_byAlignment != 0) {
+          uSize += 2;
+        }
+
+        printf("Given %u bytes\n", uSize);
+
+        m_vBlocksPool.emplace_back(uSize, m_byAlignment);
         m_pCurrentPool = &m_vBlocksPool[m_vBlocksPool.size() - 1];
       }
     }
@@ -128,7 +160,7 @@ public:
 private:
   class Block {
   public:
-    Block(byte* pAddress, std::size_t uSize, uint64 uId = 65535, 
+    Block(byte* pAddress, uint64 uSize, uint64 uId = 65535, 
         Block* pNextFreeBlock = nullptr, bool bFree = false) {
       
       m_pAddress = pAddress;
@@ -166,7 +198,7 @@ private:
       printf("Block address: %p\tid: %u\tsize: %u \tfree: %d\n", m_pAddress, m_uId, m_uSize, m_bFree);
     }
 
-    void resize(std::size_t uNewSize, byte* pNewAddress = nullptr, bool bIsFree = false) {
+    void resize(uint64 uNewSize, byte* pNewAddress = nullptr, bool bIsFree = false) {
       m_uSize = uNewSize;
       m_bFree = bIsFree;
       if (pNewAddress != nullptr) {
@@ -196,12 +228,17 @@ private:
 
   class BlockPool {
   public:
-    BlockPool(std::size_t uMemoryAmount) {
+    BlockPool(uint64 uMemoryAmount, byte byAlignment = 1) {
       m_uMaxMemory = uMemoryAmount;
+      m_byAlignment = byAlignment;
       m_pMemStart = (byte*)malloc(uMemoryAmount);
       printf("Starting address: \t%p\nMax address: \t\t%p\n", m_pMemStart, m_pMemStart + uMemoryAmount);
       if (m_pMemStart != nullptr) {
-        //m_lBlocks.emplace_back(Block(m_pMemStart, uMemoryAmount, sm_uBlockCount, nullptr, true));
+        if (!isAddressAligned(m_pMemStart, m_byAlignment)) {
+          printf("WARNING, MEMORY ISN'T ALIGNED TO %u bytes\n", m_byAlignment);
+        }
+
+        // Calls copy constructor: m_lBlocks.emplace_back(Block(m_pMemStart, uMemoryAmount, sm_uBlockCount, nullptr, true));
         m_lBlocks.emplace_back(m_pMemStart, uMemoryAmount, sm_uBlockCount, nullptr, true);
         ++sm_uBlockCount;
         m_pBigFreeBlock = &m_lBlocks.front();
@@ -226,7 +263,7 @@ private:
       }
     }
 
-    inline byte* requestBlock(std::size_t uRequestedSize) {
+    inline byte* requestBlock(uint64 uRequestedSize) {
 
       cChrono.start();
 
@@ -256,10 +293,19 @@ private:
       } while (uFirstFreeBlockSize < uRequestedSize || m_pFirstFreeBlock->isFree() == false);
 
       if (m_pFirstFreeBlock == nullptr) {
-        // TODO: implement a system to alloc another big block of memory and manage this new big blocks
+        // RESOLVED? -> TODO: implement a system to alloc another big block of memory and manage this new big blocks
         printf("Not enough memory, returning malloc() address\t-> W: Allocator::requestBlock\n");
         return (byte*)malloc(uRequestedSize);
       }
+
+      // if (m_byAlignment > uRequestedSize) {
+      //   uRequestedSize = (uint64)(m_byAlignment);
+      // }
+
+      /* Above and below are equivalent */
+      
+      // Source: http://graphics.stanford.edu/~seander/bithacks.html#IntegerMinOrMax
+      uRequestedSize = uRequestedSize ^ ((uRequestedSize ^ m_byAlignment) & -(uRequestedSize < m_byAlignment));
 
       if (uFirstFreeBlockSize >= uRequestedSize) {
         if (uFirstFreeBlockSize > uRequestedSize) {
@@ -268,6 +314,9 @@ private:
           uResizedMemAmount -= uRequestedSize;
           bUseCurrentBlock = false;
 
+          if (!isAddressAligned(pNewBlockAddress, m_byAlignment)) {
+            printf("WARNING, MEMORY ISN'T ALIGNED TO %u bytes\n", m_byAlignment);
+          }
           printf("new block address: %p\n", pNewBlockAddress);
           m_pFirstFreeBlock->print();
 
@@ -637,7 +686,7 @@ private:
       return m_lBlocks;
     }
 
-    std::size_t getFreeMemory() const {
+    uint64 getFreeMemory() const {
       return  m_uMaxMemory - m_uUsedMemory;
     }
 
@@ -695,12 +744,14 @@ private:
     uint64 m_uUsedMemory;
     uint64 m_uMaxMemory;
     byte* m_pMemStart;
+    byte m_byAlignment;
   };  // BlockPool
 
   // Allocator variables
   std::vector<BlockPool> m_vBlocksPool;
   BlockPool* m_pCurrentPool = nullptr;
   static uint64 sm_uBlockCount;
+  byte m_byAlignment;
 
 };  // Allocator
 
