@@ -24,4 +24,10 @@ V 0.0.1
         if the Allocator cannot retrieve one,
         do a coalesce pass and try to get a block again
 
+      -- TODO: there is a bug in BlockPool::requestBlock() where when emplacing back/emplacing/pushing back an element (from the second pool), m_pBigFreeBlock of the first pool
+      changes its address. Maybe the thing is that when the std::list is creating this new
+      element, it occupies the position/address of m_pBigFreeBlock from the first pool. It's 
+      very strange in any case. 
+      Maybe it will be fixed if replacing the std::list m_lBlocks for a std::vector or elm::vector.
+
 -------

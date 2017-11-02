@@ -97,7 +97,7 @@ public:
     }
     // else -> there is enough memory, so go on
 
-    return m_pCurrentPool->requestBlock(uRequestedSize);
+    return m_pCurrentPool->requestBlock(uRequestedSize, &m_vBlocksPool);
   }
 
   // Try to optimize the function by limting the search sorted by pools
@@ -108,8 +108,10 @@ public:
     printf("Given address: %p\n", pAddress);
     for (uint64 i = 0; i < m_vBlocksPool.size(); ++i) {
       //pPoolAddress = m_vBlocksPool[i].m_pBigFreeBlock->getAddress();
+      const byte* pTmp = m_vBlocksPool[i].m_pBigFreeBlock->getAddress();
+      printf("m_pBigFreeBlock address: %p\n", pTmp);
       pPoolAddress = m_vBlocksPool[i].m_lBlocks.begin()->getAddress();
-      printf("pPoolAddress: %p\n", pPoolAddress);
+      printf("pPoolAddress           : %p\n", pPoolAddress);
       uPoolSize = m_vBlocksPool[i].m_uMaxMemory;
       if (pPoolAddress <= pAddress && pAddress < pPoolAddress + uPoolSize) {
         printf("Pool #%u\n", i);
@@ -150,7 +152,7 @@ public:
       uUsedMemory += e.getUsedMemory();
     }
 
-    printf("Used memory: %u\n", uUsedMemory);
+    printf("Used memory: %u bytes\n", uUsedMemory);
   }
 
   void printNumElements() {
@@ -262,8 +264,8 @@ private:
         printf("Memory correctly released\n");
       }
     }
-
-    inline byte* requestBlock(uint64 uRequestedSize) {
+                                              // TODO: remove this parameter, it's only for testing purposes
+    byte* requestBlock(uint64 uRequestedSize, std::vector<BlockPool>* pBlockPools) {
 
       cChrono.start();
 
@@ -320,11 +322,27 @@ private:
           printf("new block address: %p\n", pNewBlockAddress);
           m_pFirstFreeBlock->print();
 
-          m_lBlocks.emplace_back(Block(pNewBlockAddress, uRequestedSize, 
-            sm_uBlockCount, nullptr, bUseCurrentBlock));
+          printf("[0] before m_pBigFreeBlock: %p\n", pBlockPools->at(0).m_pBigFreeBlock->getAddress());
+
+          // Block cBlock(pNewBlockAddress, uRequestedSize, 
+          //   sm_uBlockCount, nullptr, bUseCurrentBlock);
+          // m_lBlocks.push_back(cBlock);
+
+          // TODO: the problem with m_pBigFreeBlock changing addresses is HERE
+          // Try changing m_lBlocks for a vector (preferably elm::vector)    
+          m_lBlocks.emplace_back(pNewBlockAddress, uRequestedSize, 
+            sm_uBlockCount, nullptr, bUseCurrentBlock);
+          
+          // auto it = m_lBlocks.begin();
+          // std::advance(it, m_lBlocks.size() - 1);
+          // m_lBlocks.emplace(it, pNewBlockAddress, uRequestedSize, 
+          //   sm_uBlockCount, nullptr, bUseCurrentBlock);
+          
           ++sm_uBlockCount;
 
-          m_uUsedMemory += uRequestedSize;
+          printf("[0] after m_pBigFreeBlock: %p\n", pBlockPools->at(0).m_pBigFreeBlock->getAddress());
+
+          //m_uUsedMemory += uRequestedSize;
 
           bUseCurrentBlock = true;
         }
@@ -332,17 +350,30 @@ private:
           // don't create another block, use the first free one without splitting
           printf("Reusing existing block\n");
           bUseCurrentBlock = false;
-          m_uUsedMemory += uRequestedSize;
+          //m_uUsedMemory += uRequestedSize;
         }
         if (m_pFirstFreeBlock->getAddress() == m_pBigFreeBlock->getAddress()) {
           printf("Splitting FIRST block!\n");
         }
         m_pFirstFreeBlock->resize(uResizedMemAmount, nullptr, bUseCurrentBlock);
+        m_uUsedMemory += uRequestedSize;
 
         cChrono.stop();
         printf("\n\nTime to request block: %.3fms\n\n", cChrono.timeAsMilliseconds());
         average_request += cChrono.timeAsMilliseconds();
         ++times_request;
+
+        
+        // TODO: -- remove --
+        if (bUseCurrentBlock) {
+          auto it = m_lBlocks.begin();
+          std::advance(it, m_lBlocks.size() - 1);
+          return (byte*)(it->getAddress());
+        }
+        else {
+          return (byte*)m_pFirstFreeBlock->getAddress();
+        }
+        // TODO: -- remove --
 
         return pNewBlockAddress;
       }
@@ -725,6 +756,8 @@ private:
         it != m_lBlocks.end(); ++it) {
         it->print();
       }*/
+
+      printf("m_pBigFreeBlock address: %p\n", m_pBigFreeBlock->getAddress());
     }
 
     void* getBigBlockAddress() const {
