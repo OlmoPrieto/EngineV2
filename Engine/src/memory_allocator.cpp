@@ -110,7 +110,8 @@ public:
       //pPoolAddress = m_vBlocksPool[i].m_pBigFreeBlock->getAddress();
       const byte* pTmp = m_vBlocksPool[i].m_pBigFreeBlock->getAddress();
       printf("m_pBigFreeBlock address: %p\n", pTmp);
-      pPoolAddress = m_vBlocksPool[i].m_lBlocks.begin()->getAddress();
+      //pPoolAddress = m_vBlocksPool[i].m_lBlocks.begin()->getAddress();
+      pPoolAddress = m_vBlocksPool[i].m_vBlocks.begin()->getAddress();
       printf("pPoolAddress           : %p\n", pPoolAddress);
       uPoolSize = m_vBlocksPool[i].m_uMaxMemory;
       if (pPoolAddress <= pAddress && pAddress < pPoolAddress + uPoolSize) {
@@ -240,12 +241,16 @@ private:
           printf("WARNING, MEMORY ISN'T ALIGNED TO %u bytes\n", m_byAlignment);
         }
 
-        // Calls copy constructor: m_lBlocks.emplace_back(Block(m_pMemStart, uMemoryAmount, sm_uBlockCount, nullptr, true));
-        m_lBlocks.emplace_back(m_pMemStart, uMemoryAmount, sm_uBlockCount, nullptr, true);
+        // TODO: this below it's just for testing, do it the right way
+        m_vBlocks.reserve(10);
+        
+        // This calls copy constructor: m_lBlocks.emplace_back(Block(m_pMemStart, uMemoryAmount, sm_uBlockCount, nullptr, true));
+        // m_lBlocks.emplace_back(m_pMemStart, uMemoryAmount, sm_uBlockCount, nullptr, true);
+        m_vBlocks.emplace_back(m_pMemStart, uMemoryAmount, sm_uBlockCount, nullptr, true);
         ++sm_uBlockCount;
-        m_pBigFreeBlock = &m_lBlocks.front();
-        m_pFirstFreeBlock = &m_lBlocks.front();
-        m_lBlocks.front().m_pNextFreeBlock = m_pBigFreeBlock;
+        m_pBigFreeBlock = &m_vBlocks.front();
+        m_pFirstFreeBlock = &m_vBlocks.front();
+        m_vBlocks.front().m_pNextFreeBlock = m_pBigFreeBlock;
 
         m_uUsedMemory = 0;
       } 
@@ -330,7 +335,7 @@ private:
 
           // TODO: the problem with m_pBigFreeBlock changing addresses is HERE
           // Try changing m_lBlocks for a vector (preferably elm::vector)    
-          m_lBlocks.emplace_back(pNewBlockAddress, uRequestedSize, 
+          m_vBlocks.emplace_back(pNewBlockAddress, uRequestedSize, 
             sm_uBlockCount, nullptr, bUseCurrentBlock);
           
           // auto it = m_lBlocks.begin();
@@ -366,8 +371,8 @@ private:
         
         // TODO: -- remove --
         if (bUseCurrentBlock) {
-          auto it = m_lBlocks.begin();
-          std::advance(it, m_lBlocks.size() - 1);
+          auto it = m_vBlocks.begin();
+          std::advance(it, m_vBlocks.size() - 1);
           return (byte*)(it->getAddress());
         }
         else {
@@ -391,8 +396,8 @@ private:
       Chrono cChrono;
       cChrono.start();
 
-      auto it = m_lBlocks.begin();
-      while (it != m_lBlocks.end()) {
+      auto it = m_vBlocks.begin();
+      while (it != m_vBlocks.end()) {
         if (pAddress == it->getAddress()) {//} && it->getId() != 0) {
           it->release();
           m_uUsedMemory -= it->getSize();
@@ -423,15 +428,15 @@ private:
     }
 
     void releaseAllBlocks() {
-      auto it = m_lBlocks.begin();
+      auto it = m_vBlocks.begin();
 
       do {
         if (!coalesceBlocks(&it)) {
-          if (it != m_lBlocks.end()) {
+          if (it != m_vBlocks.end()) {
             ++it;
           }
         }
-      } while (m_lBlocks.size() > 1);
+      } while (m_vBlocks.size() > 1);
 
 
       // m_lBlocks.size() == 1 -> true
@@ -449,7 +454,7 @@ private:
 
     // TODO: test with main coalescing function
     // private:
-    bool checkAndCoalesce(std::list<Allocator::Block>::iterator* pIt, 
+    bool checkAndCoalesce(std::vector<Allocator::Block>::iterator* pIt, 
       IteratorCheckDirection eCheckDirection) {
       
       bool bReturn = false;
@@ -493,7 +498,7 @@ private:
           pPrevBlock->getSize(), nullptr, true);
         pBlockToCoalesce->print();
 
-        m_lBlocks.erase(*pIt);
+        m_vBlocks.erase(*pIt);
         
         bReturn = true;
       }
@@ -502,7 +507,7 @@ private:
     }
 
     // @return true if could coalesce at least one block
-    bool coalesceBlocks(std::list<Allocator::Block>::iterator* pIt = nullptr) {
+    bool coalesceBlocks(std::vector<Allocator::Block>::iterator* pIt = nullptr) {
       printf("Coalescing...\n");
       printf("Elements before coalescing: ");
       printNumElements();
@@ -510,7 +515,7 @@ private:
 
       if (pIt != nullptr) {
         // check if previous block is free
-        if ((*pIt) != m_lBlocks.begin()) {
+        if ((*pIt) != m_vBlocks.begin()) {
           Block* pBlockToCoalesce = &(*(*pIt));
           Block* pPrevBlock = nullptr;
 
@@ -561,7 +566,7 @@ private:
 
             auto aux = --(*pIt);
             ++(*pIt);
-            m_lBlocks.erase(*pIt);
+            m_vBlocks.erase(*pIt);
             *pIt = aux;
             
             bReturn = true;
@@ -570,7 +575,7 @@ private:
         else {
           // pIt points to list::begin
 
-          if (m_lBlocks.size() > 1) {
+          if (m_vBlocks.size() > 1) {
             Block* pBlockToCoalesce = &(*(*pIt));
             Block* pPrevBlock = nullptr;
 
@@ -595,7 +600,7 @@ private:
 
               auto aux = --(*pIt);
               ++(*pIt);
-              m_lBlocks.erase(*pIt);
+              m_vBlocks.erase(*pIt);
               *pIt = aux;
 
               bReturn = true;
@@ -607,7 +612,7 @@ private:
         // ++(*pIt) shouldn't crash because it will always point to at least the last element
 
         // check the NEXT block            // maybe not needed, delete!
-        if (++(*pIt) != m_lBlocks.end() && --(*pIt) != m_lBlocks.end()) {
+        if (++(*pIt) != m_vBlocks.end() && --(*pIt) != m_vBlocks.end()) {
           Block* pBlockToCoalesce = &(*(*pIt));
           Block* pPrevBlock = nullptr;
 
@@ -640,7 +645,7 @@ private:
 
             auto aux = --(*pIt);
             ++(*pIt);
-            m_lBlocks.erase(*pIt);
+            m_vBlocks.erase(*pIt);
             *pIt = aux;
 
             bReturn = true;
@@ -662,9 +667,9 @@ private:
     // and to find the first released block. Then is when the party start
     //  Do not call this if not trying to find a block because this can return nullptr
     Block* findFirstFreeBlock(uint64 uSize = 0) {
-      auto it = m_lBlocks.begin();
+      auto it = m_vBlocks.begin();
 
-      while (it != m_lBlocks.end()) {
+      while (it != m_vBlocks.end()) {
         printf("findFirstFreeBlock() ID: %u\n", it->getId());
         if (it->isFree() == true) {
           #if (ALLOC_POLICY_BEST_FIT == 1)
@@ -695,7 +700,7 @@ private:
     }
 
     const Allocator::Block& getBlock(short shIndex) {
-      assert(shIndex < m_lBlocks.size() && "Index greater than the list's size\n");
+      assert(shIndex < m_vBlocks.size() && "Index greater than the list's size\n");
 
       /*short shTmp = 0;
       for (std::list<Allocator::Block>::const_iterator it = m_lBlocks.begin();
@@ -708,13 +713,13 @@ private:
         }
       }*/
 
-      auto it = m_lBlocks.begin();
+      auto it = m_vBlocks.begin();
       std::advance(it, shIndex);
       return *it;
     }
 
-    const std::list<Allocator::Block>& getBlocks() const {
-      return m_lBlocks;
+    const std::vector<Allocator::Block>& getBlocks() const {
+      return m_vBlocks;
     }
 
     uint64 getFreeMemory() const {
@@ -730,7 +735,7 @@ private:
     }
 
     uint64 getNumElements() const {
-      return m_lBlocks.size();
+      return m_vBlocks.size();
     }
 
     void printUsedMemory() const {
@@ -742,11 +747,11 @@ private:
     }
 
     void printAllElements() const {
-      auto it = m_lBlocks.begin();
+      auto it = m_vBlocks.begin();
       printf("Printing all the elements...\n");
       printNumElements();
 
-      while (it != m_lBlocks.end()) {
+      while (it != m_vBlocks.end()) {
         it->print();
         ++it;
         //std::advance(it, 1);
@@ -771,7 +776,8 @@ private:
   //private:
     //static uint64 sm_uBlockCount;
 
-    std::list<Block> m_lBlocks;
+    //std::list<Block> m_lBlocks;
+    std::vector<Block> m_vBlocks;
     Block* m_pBigFreeBlock;
     Block* m_pFirstFreeBlock;
     uint64 m_uUsedMemory;
