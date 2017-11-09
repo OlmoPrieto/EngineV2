@@ -52,7 +52,7 @@ public:
   }
 
   ~Allocator() {
-    printf("Num pools: %u\n", m_vBlocksPool.size());
+    printf("Num pools: %lu\n", m_vBlocksPool.size());
 
     while (m_vBlocksPool.size() > 0) {
       m_vBlocksPool[m_vBlocksPool.size() - 1].releaseAllBlocks();
@@ -91,13 +91,18 @@ public:
 
         printf("Given %u bytes\n", uSize);
 
+        m_vBlocksPool[0].m_pBigFreeBlock->print();
         m_vBlocksPool.emplace_back(uSize, m_byAlignment);
+        for (uint64 i = 0; i < m_vBlocksPool.size(); ++i) {
+          m_vBlocksPool[i].m_pBigFreeBlock = &(m_vBlocksPool[i].m_vBlocks[0]);
+        }
+        m_vBlocksPool[0].m_pBigFreeBlock->print();
         m_pCurrentPool = &m_vBlocksPool[m_vBlocksPool.size() - 1];
       }
     }
     // else -> there is enough memory, so go on
 
-    return m_pCurrentPool->requestBlock(uRequestedSize, &m_vBlocksPool);
+    return m_pCurrentPool->requestBlock(uRequestedSize);
   }
 
   // Try to optimize the function by limting the search sorted by pools
@@ -166,6 +171,10 @@ private:
     Block(byte* pAddress, uint64 uSize, uint64 uId = 65535, 
         Block* pNextFreeBlock = nullptr, bool bFree = false) {
       
+      printf("Block constructor\n");
+      printf("Address given: %p\n", pAddress);
+      printf("ID: %u\n", uId);
+
       m_pAddress = pAddress;
       m_pNextFreeBlock = pNextFreeBlock;
       m_uSize = uSize;
@@ -240,9 +249,6 @@ private:
         if (!isAddressAligned(m_pMemStart, m_byAlignment)) {
           printf("WARNING, MEMORY ISN'T ALIGNED TO %u bytes\n", m_byAlignment);
         }
-
-        // TODO: this below it's just for testing, do it the right way
-        m_vBlocks.reserve(10);
         
         // This calls copy constructor: m_lBlocks.emplace_back(Block(m_pMemStart, uMemoryAmount, sm_uBlockCount, nullptr, true));
         // m_lBlocks.emplace_back(m_pMemStart, uMemoryAmount, sm_uBlockCount, nullptr, true);
@@ -269,20 +275,24 @@ private:
         printf("Memory correctly released\n");
       }
     }
+
                                               // TODO: remove this parameter, it's only for testing purposes
-    byte* requestBlock(uint64 uRequestedSize, std::vector<BlockPool>* pBlockPools) {
+    byte* requestBlock(uint64 uRequestedSize) {
 
       cChrono.start();
 
       byte* pNewBlockAddress = nullptr;
       uint64 uFirstFreeBlockSize = 0;
       uint64 uResizedMemAmount = uFirstFreeBlockSize;
+      uint64 uFirstFreeBlockIndex = (1 << 32) - 1;
       bool bUseCurrentBlock = true;
 
       uint64 loops = 0;
       do {
         #if (ALLOC_POLICY_BEST_FIT == 1)
-          m_pFirstFreeBlock = findFirstFreeBlock(uRequestedSize);
+          //m_pFirstFreeBlock = findFirstFreeBlock(uRequestedSize);
+          uFirstFreeBlockIndex = findFirstFreeBlock(uRequestedSize);
+          m_pFirstFreeBlock = &m_vBlocks[uFirstFreeBlockIndex];
         #elif (ALLOC_POLICY_SPLIT_BIG_BLOCK == 1)
           m_pFirstFreeBlock = m_pBigFreeBlock;
         #endif
@@ -324,30 +334,17 @@ private:
           if (!isAddressAligned(pNewBlockAddress, m_byAlignment)) {
             printf("WARNING, MEMORY ISN'T ALIGNED TO %u bytes\n", m_byAlignment);
           }
-          printf("new block address: %p\n", pNewBlockAddress);
-          m_pFirstFreeBlock->print();
 
-          printf("[0] before m_pBigFreeBlock: %p\n", pBlockPools->at(0).m_pBigFreeBlock->getAddress());
-
-          // Block cBlock(pNewBlockAddress, uRequestedSize, 
-          //   sm_uBlockCount, nullptr, bUseCurrentBlock);
-          // m_lBlocks.push_back(cBlock);
-
-          // TODO: the problem with m_pBigFreeBlock changing addresses is HERE
-          // Try changing m_lBlocks for a vector (preferably elm::vector)    
+          // -- IF a reallocation happens, the pointers get invalidated, 
+          //   so m_pBigFreeBlock which was pointing to an address gets invalidated.
           m_vBlocks.emplace_back(pNewBlockAddress, uRequestedSize, 
             sm_uBlockCount, nullptr, bUseCurrentBlock);
           
-          // auto it = m_lBlocks.begin();
-          // std::advance(it, m_lBlocks.size() - 1);
-          // m_lBlocks.emplace(it, pNewBlockAddress, uRequestedSize, 
-          //   sm_uBlockCount, nullptr, bUseCurrentBlock);
+          // for if reallocation happens
+          m_pBigFreeBlock = &m_vBlocks[0];
+          m_pFirstFreeBlock = &m_vBlocks[uFirstFreeBlockIndex];
           
           ++sm_uBlockCount;
-
-          printf("[0] after m_pBigFreeBlock: %p\n", pBlockPools->at(0).m_pBigFreeBlock->getAddress());
-
-          //m_uUsedMemory += uRequestedSize;
 
           bUseCurrentBlock = true;
         }
@@ -367,18 +364,6 @@ private:
         printf("\n\nTime to request block: %.3fms\n\n", cChrono.timeAsMilliseconds());
         average_request += cChrono.timeAsMilliseconds();
         ++times_request;
-
-        
-        // TODO: -- remove --
-        if (bUseCurrentBlock) {
-          auto it = m_vBlocks.begin();
-          std::advance(it, m_vBlocks.size() - 1);
-          return (byte*)(it->getAddress());
-        }
-        else {
-          return (byte*)m_pFirstFreeBlock->getAddress();
-        }
-        // TODO: -- remove --
 
         return pNewBlockAddress;
       }
@@ -666,37 +651,70 @@ private:
     // to determine if the big block has no more free memory
     // and to find the first released block. Then is when the party start
     //  Do not call this if not trying to find a block because this can return nullptr
-    Block* findFirstFreeBlock(uint64 uSize = 0) {
-      auto it = m_vBlocks.begin();
+    // Block* findFirstFreeBlock(uint64 uSize = 0) {
+    //   auto it = m_vBlocks.begin();
 
-      while (it != m_vBlocks.end()) {
-        printf("findFirstFreeBlock() ID: %u\n", it->getId());
-        if (it->isFree() == true) {
+    //   while (it != m_vBlocks.end()) {
+    //     printf("findFirstFreeBlock() ID: %u\n", it->getId());
+    //     if (it->isFree() == true) {
+    //       #if (ALLOC_POLICY_BEST_FIT == 1)
+    //         if (it->getSize() >= uSize) {
+    //           printf("Found free block: ");
+    //           it->print();
+
+    //           return &(*it);
+    //         }
+    //       #elif (ALLOC_POLICY_SPLIT_BIG_BLOCK == 1)
+    //         if (m_pBigFreeBlock->getSize() < uRequestedSize) {
+    //           printf("WARNING, first big block not big enough");
+    //         }
+    //         return m_pBigFreeBlock;
+    //       #else
+
+    //         printf("Found free block: ");
+    //         it->print();
+
+    //         return &(*it);
+    //       #endif
+    //     }
+
+    //     ++it;
+    //   }
+
+    //   return nullptr;
+    // }
+    uint64 findFirstFreeBlock(uint64 uSize = 0) {
+      Block* pBlock = nullptr;
+      for (uint64 i = 0; i < m_vBlocks.size(); ++i) {
+        pBlock = &m_vBlocks[i];
+        printf("findFirstFreeBlock() ID: %u\n", pBlock->getId());
+        if (pBlock->isFree() == true) {
           #if (ALLOC_POLICY_BEST_FIT == 1)
-            if (it->getSize() >= uSize) {
+            if (pBlock->getSize() >= uSize) {
               printf("Found free block: ");
-              it->print();
+              pBlock->print();
 
-              return &(*it);
+              //return i;
             }
           #elif (ALLOC_POLICY_SPLIT_BIG_BLOCK == 1)
             if (m_pBigFreeBlock->getSize() < uRequestedSize) {
               printf("WARNING, first big block not big enough");
             }
-            return m_pBigFreeBlock;
+            i = 0;
+            //return 0; // index zero (0) in the container is always going to be the first big block
           #else
 
             printf("Found free block: ");
-            it->print();
+            pBlock->print();
 
-            return &(*it);
+            //return i;
           #endif
-        }
 
-        ++it;
+          return i;
+        }
       }
 
-      return nullptr;
+      return (1 << 32) - 1; // (2^32) in case the program is running on 32 bits
     }
 
     const Allocator::Block& getBlock(short shIndex) {
@@ -805,12 +823,14 @@ public:
     printf("T Class size: %lu\n", sizeof(T));
 
     m_pPtr = new (cAlloc.requestBlock(sizeof(T))) T(constructor);
+    printf("mptr address: %p\n", (byte*)m_pPtr);
   }
 
   mptr() {
     printf("T Class size: %lu\n", sizeof(T));
     
     m_pPtr = new (cAlloc.requestBlock(sizeof(T))) T();
+    printf("mptr address: %p\n", (byte*)m_pPtr);
   }
 
   T* get() const {
