@@ -91,12 +91,11 @@ public:
 
         printf("Given %u bytes\n", uSize);
 
-        m_vBlocksPool[0].m_pBigFreeBlock->print();
         m_vBlocksPool.emplace_back(uSize, m_byAlignment);
+        // for if emplace_back reallocates the elements and pointers gets invalidated
         for (uint64 i = 0; i < m_vBlocksPool.size(); ++i) {
           m_vBlocksPool[i].m_pBigFreeBlock = &(m_vBlocksPool[i].m_vBlocks[0]);
         }
-        m_vBlocksPool[0].m_pBigFreeBlock->print();
         m_pCurrentPool = &m_vBlocksPool[m_vBlocksPool.size() - 1];
       }
     }
@@ -112,12 +111,8 @@ public:
     bool bBlockFound = false;
     printf("Given address: %p\n", pAddress);
     for (uint64 i = 0; i < m_vBlocksPool.size(); ++i) {
-      //pPoolAddress = m_vBlocksPool[i].m_pBigFreeBlock->getAddress();
-      const byte* pTmp = m_vBlocksPool[i].m_pBigFreeBlock->getAddress();
-      printf("m_pBigFreeBlock address: %p\n", pTmp);
-      //pPoolAddress = m_vBlocksPool[i].m_lBlocks.begin()->getAddress();
-      pPoolAddress = m_vBlocksPool[i].m_vBlocks.begin()->getAddress();
-      printf("pPoolAddress           : %p\n", pPoolAddress);
+      pPoolAddress = m_vBlocksPool[i].m_pBigFreeBlock->getAddress();
+      printf("m_pBigFreeBlock address: %p\n", pPoolAddress);
       uPoolSize = m_vBlocksPool[i].m_uMaxMemory;
       if (pPoolAddress <= pAddress && pAddress < pPoolAddress + uPoolSize) {
         printf("Pool #%u\n", i);
@@ -143,19 +138,22 @@ public:
   }
 
   void printAllElements() const {
-    // for (uint64 i = 0; i < m_vBlocksPool.size(); ++i) {
-
-    // }
-    for (const auto& e : m_vBlocksPool) {
-      e.printAllElements();
+    for (uint64 i = 0; i < m_vBlocksPool.size(); ++i) {
+      m_vBlocksPool[i].printAllElements();
     }
+    // for (const auto& e : m_vBlocksPool) {
+    //   e.printAllElements();
+    // }
   }
 
   void printUsedMemory() {
     uint64 uUsedMemory = 0;
 
-    for (const auto& e : m_vBlocksPool) {
-      uUsedMemory += e.getUsedMemory();
+    // for (const auto& e : m_vBlocksPool) {
+    //   uUsedMemory += e.getUsedMemory();
+    // }
+    for (uint64 i = 0; i < m_vBlocksPool.size(); ++i) {
+      uUsedMemory += m_vBlocksPool[i].getUsedMemory();
     }
 
     printf("Used memory: %u bytes\n", uUsedMemory);
@@ -254,9 +252,12 @@ private:
         // m_lBlocks.emplace_back(m_pMemStart, uMemoryAmount, sm_uBlockCount, nullptr, true);
         m_vBlocks.emplace_back(m_pMemStart, uMemoryAmount, sm_uBlockCount, nullptr, true);
         ++sm_uBlockCount;
-        m_pBigFreeBlock = &m_vBlocks.front();
-        m_pFirstFreeBlock = &m_vBlocks.front();
-        m_vBlocks.front().m_pNextFreeBlock = m_pBigFreeBlock;
+        // m_pBigFreeBlock = &m_vBlocks.front();
+        // m_pFirstFreeBlock = &m_vBlocks.front();
+        // m_vBlocks.front().m_pNextFreeBlock = m_pBigFreeBlock;
+        m_pBigFreeBlock = &m_vBlocks[0];
+        m_pFirstFreeBlock = &m_vBlocks[0];
+        m_vBlocks[0].m_pNextFreeBlock = m_pBigFreeBlock;
 
         m_uUsedMemory = 0;
       } 
@@ -276,7 +277,6 @@ private:
       }
     }
 
-                                              // TODO: remove this parameter, it's only for testing purposes
     byte* requestBlock(uint64 uRequestedSize) {
 
       cChrono.start();
@@ -292,6 +292,7 @@ private:
         #if (ALLOC_POLICY_BEST_FIT == 1)
           //m_pFirstFreeBlock = findFirstFreeBlock(uRequestedSize);
           uFirstFreeBlockIndex = findFirstFreeBlock(uRequestedSize);
+          printf("index retrieved by findFirstFreeBlock(): %u\n", uFirstFreeBlockIndex);
           m_pFirstFreeBlock = &m_vBlocks[uFirstFreeBlockIndex];
         #elif (ALLOC_POLICY_SPLIT_BIG_BLOCK == 1)
           m_pFirstFreeBlock = m_pBigFreeBlock;
@@ -374,7 +375,6 @@ private:
       return nullptr;
     }
 
-    // TODO: implement a version of everything with a std::vector and compare performance
     bool releaseBlock(byte* pAddress) {
       printf("Trying to release block with address %p...\n", pAddress);
 
@@ -411,6 +411,38 @@ private:
 
       return false;
     }
+    // TODO: this function cannot be uncommented until coalesceBlocks() has been changed 
+    //       (to receive) a pointer a pointer to Block instead a pointer to iterator
+    // bool releaseBlock(byte* pAddress) {
+    //   printf("Trying to release block with address %p...\n", pAddress);
+
+    //   Chrono cChrono;
+    //   cChrono.start();
+
+    //   Block* pBlock = &m_vBlocks[0];
+    //   for (uint64 i = 0; i < m_vBlocks.size(); ++i) {
+    //     if (pAddress == pBlock->getAddress()) {
+    //       m_uUsedMemory -= pBlock->getSize();
+    //       printf("Releasing block %u with address: %p\n", pBlock->getId(), pAddress);
+    //       pBlock->release();
+
+    //       coalesceBlocks(&pBlock);
+
+    //       cChrono.stop();
+    //       printf("Time to release block: %.3fms\n", cChrono.timeAsMilliseconds());
+    //       average_free += cChrono.timeAsMilliseconds();
+    //       ++times_free;
+    //       return true;
+    //     }
+    //   }
+
+    //   cChrono.stop();
+    //   printf("Time to release block: %.3fms\n", cChrono.timeAsMilliseconds());
+    //   average_free += cChrono.timeAsMilliseconds();
+    //   ++times_free;
+
+    //   return false;
+    // }
 
     void releaseAllBlocks() {
       auto it = m_vBlocks.begin();
@@ -687,30 +719,30 @@ private:
       Block* pBlock = nullptr;
       for (uint64 i = 0; i < m_vBlocks.size(); ++i) {
         pBlock = &m_vBlocks[i];
-        printf("findFirstFreeBlock() ID: %u\n", pBlock->getId());
+        //printf("findFirstFreeBlock() ID: %u\n", pBlock->getId());
         if (pBlock->isFree() == true) {
           #if (ALLOC_POLICY_BEST_FIT == 1)
             if (pBlock->getSize() >= uSize) {
               printf("Found free block: ");
               pBlock->print();
 
-              //return i;
+              return i;
             }
           #elif (ALLOC_POLICY_SPLIT_BIG_BLOCK == 1)
             if (m_pBigFreeBlock->getSize() < uRequestedSize) {
               printf("WARNING, first big block not big enough");
             }
-            i = 0;
-            //return 0; // index zero (0) in the container is always going to be the first big block
+            //i = 0;
+            return 0; // index zero (0) in the container is always going to be the first big block
           #else
 
             printf("Found free block: ");
             pBlock->print();
 
-            //return i;
+            return i;
           #endif
 
-          return i;
+          //return i;
         }
       }
 
@@ -720,20 +752,11 @@ private:
     const Allocator::Block& getBlock(short shIndex) {
       assert(shIndex < m_vBlocks.size() && "Index greater than the list's size\n");
 
-      /*short shTmp = 0;
-      for (std::list<Allocator::Block>::const_iterator it = m_lBlocks.begin();
-        it != m_lBlocks.end(); ++it) {
-        if (shTmp == shIndex) {
-          return *it;
-        }
-        else {
-          ++shTmp;
-        }
-      }*/
+      return m_vBlocks[shIndex];
 
-      auto it = m_vBlocks.begin();
-      std::advance(it, shIndex);
-      return *it;
+      // auto it = m_vBlocks.begin();
+      // std::advance(it, shIndex);
+      // return *it;
     }
 
     const std::vector<Allocator::Block>& getBlocks() const {
@@ -765,20 +788,18 @@ private:
     }
 
     void printAllElements() const {
-      auto it = m_vBlocks.begin();
+      //auto it = m_vBlocks.begin();
       printf("Printing all the elements...\n");
       printNumElements();
 
-      while (it != m_vBlocks.end()) {
-        it->print();
-        ++it;
-        //std::advance(it, 1);
-      }
+      // while (it != m_vBlocks.end()) {
+      //   it->print();
+      //   ++it;
+      // }
 
-      /*for (std::list<Allocator::Block>::const_iterator it = m_lBlocks.begin();
-        it != m_lBlocks.end(); ++it) {
-        it->print();
-      }*/
+      for (uint64 i = 0; i < m_vBlocks.size(); ++i) {
+        m_vBlocks[i].print();
+      }
 
       printf("m_pBigFreeBlock address: %p\n", m_pBigFreeBlock->getAddress());
     }
