@@ -751,9 +751,9 @@ private:
           
           // TODO: look at this for optimization, maybe this distinction is not needed
           if (pPrevBlock->getId() != 0) {
-            // normal case, a block in between the pool
-            //if (pPrevBlock->getAddress() < pBlockToCoalesce->getAddress()) {
-            if (pPrevBlock->getAddress() >= pBlockToCoalesce->getAddress() - pBlockToCoalesce->getSize()) {
+            // STANDARD case, a block in between the pool
+            if (pPrevBlock->getAddress() < pBlockToCoalesce->getAddress()) {
+            //if (pPrevBlock->getAddress() >= pBlockToCoalesce->getAddress() - pBlockToCoalesce->getSize()) {
               // swap blocks references
               Block* pBlock = pBlockToCoalesce;
 
@@ -1123,7 +1123,7 @@ public:
 };
 
 
-int main() {
+int _main_() {
   /*printf("\n=======================\n");
   printf("\nmain()\n\n");
   printf("Stats: \n"),

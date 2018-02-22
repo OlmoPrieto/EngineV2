@@ -1,7 +1,7 @@
 #ifndef __RENDER_WINDOW_H__
 #define __RENDER_WINDOW_H__
 
-#include "types.h"
+typedef unsigned short uint32;
 
 #include <memory>
 class Input;

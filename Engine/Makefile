@@ -75,6 +75,7 @@ ifeq ($(config),debug)
 	$(OBJDIR)/dependencies/GLFW/src/posix_tls.o \
 	$(OBJDIR)/dependencies/GLFW/src/window.o \
 	$(OBJDIR)/dependencies/glew/include/glew.o \
+	$(OBJDIR)/src/main.o \
 	$(OBJDIR)/src/memory_allocator.o \
 
   define PREBUILDCMDS
@@ -118,6 +119,7 @@ ifeq ($(config),release)
 	$(OBJDIR)/dependencies/GLFW/src/posix_tls.o \
 	$(OBJDIR)/dependencies/GLFW/src/window.o \
 	$(OBJDIR)/dependencies/glew/include/glew.o \
+	$(OBJDIR)/src/main.o \
 	$(OBJDIR)/src/memory_allocator.o \
 
   define PREBUILDCMDS
@@ -161,6 +163,7 @@ ifeq ($(config),debug64)
 	$(OBJDIR)/dependencies/GLFW/src/posix_tls.o \
 	$(OBJDIR)/dependencies/GLFW/src/window.o \
 	$(OBJDIR)/dependencies/glew/include/glew.o \
+	$(OBJDIR)/src/main.o \
 	$(OBJDIR)/src/memory_allocator.o \
 
   define PREBUILDCMDS
@@ -204,6 +207,7 @@ ifeq ($(config),release64)
 	$(OBJDIR)/dependencies/GLFW/src/posix_tls.o \
 	$(OBJDIR)/dependencies/GLFW/src/window.o \
 	$(OBJDIR)/dependencies/glew/include/glew.o \
+	$(OBJDIR)/src/main.o \
 	$(OBJDIR)/src/memory_allocator.o \
 
   define PREBUILDCMDS
@@ -247,6 +251,7 @@ ifeq ($(config),debug32)
 	$(OBJDIR)/dependencies/GLFW/src/posix_tls.o \
 	$(OBJDIR)/dependencies/GLFW/src/window.o \
 	$(OBJDIR)/dependencies/glew/include/glew.o \
+	$(OBJDIR)/src/main.o \
 	$(OBJDIR)/src/memory_allocator.o \
 
   define PREBUILDCMDS
@@ -290,6 +295,7 @@ ifeq ($(config),release32)
 	$(OBJDIR)/dependencies/GLFW/src/posix_tls.o \
 	$(OBJDIR)/dependencies/GLFW/src/window.o \
 	$(OBJDIR)/dependencies/glew/include/glew.o \
+	$(OBJDIR)/src/main.o \
 	$(OBJDIR)/src/memory_allocator.o \
 
   define PREBUILDCMDS
@@ -459,6 +465,10 @@ $(OBJDIR)/dependencies/GLFW/src/xkb_unicode.o: dependencies/GLFW/src/xkb_unicode
 $(OBJDIR)/dependencies/glew/include/glew.o: dependencies/glew/include/glew.c $(GCH) $(MAKEFILE)
 	@echo $(notdir $<)
 	$(SILENT) $(CC) $(ALL_CFLAGS) $(FORCE_INCLUDE) -o "$@" -c "$<"
+
+$(OBJDIR)/src/main.o: src/main.cpp $(GCH) $(MAKEFILE)
+	@echo $(notdir $<)
+	$(SILENT) $(CXX) $(ALL_CXXFLAGS) $(FORCE_INCLUDE) -o "$@" -c "$<"
 
 $(OBJDIR)/src/memory_allocator.o: src/memory_allocator.cpp $(GCH) $(MAKEFILE)
 	@echo $(notdir $<)
