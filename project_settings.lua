@@ -60,7 +60,7 @@ solution "Engine"
       links {
         "opengl32"
       }
-      defines { "_GLFW_WIN32", "_GLFW_WGL", "_GLFW_USE_OPENGL" }
+      defines { "__PLATFORM_WINDOWS__","_GLFW_WIN32", "_GLFW_WGL", "_GLFW_USE_OPENGL" }
       buildoptions_cpp("/Y-")
       windowstargetplatformversion "10.0.15063.0"
        
@@ -84,7 +84,7 @@ solution "Engine"
       "Cocoa.framework", "OpenGL.framework", "IOKit.framework", "CoreVideo.framework",
     }
     linkoptions { "-framework Cocoa","-framework QuartzCore", "-framework OpenGL", "-framework OpenAL" }
-    defines { "_GLFW_COCOA", "_GLFW_NSGL", "_GLFW_USE_OPENGL" }
+    defines { "__PLATFORM_MACOSX", "_GLFW_COCOA", "_GLFW_NSGL", "_GLFW_USE_OPENGL" }
        
     configuration { "linux" }
       files {  -- GLFW
@@ -104,9 +104,16 @@ solution "Engine"
         --"./Engine/dependencies/GLFW/include/GLFW/glfw3.h"
     }
     links {
-      "X11", "Xrandr", "Xcursor", "Xinerama", "Xi", "Xxf86vm", "rt", "pthread", "GL", "m"
+      "X11", "Xrandr", "Xcursor", "Xinerama", "Xi", "Xxf86vm", "rt", "pthread", "GL", "glut", "GLU", "m"
     }
-    defines { "_GLFW_X11", "_GLFW_HAS_GLXGETPROCADDRESS", "_GLFW_GLX", "_GLFW_USE_OPENGL" }
+    includedirs {
+      "/usr/include/GL/"
+    }
+    libdirs {
+      "/usr/bin/",
+      "/usr/lib/"
+    }
+    defines { "__PLATFORM_LINUX__", "_GLFW_X11", "_GLFW_HAS_GLXGETPROCADDRESS", "_GLFW_GLX", "_GLFW_USE_OPENGL" }
 
     configuration "debug"
       defines { "DEBUG" }

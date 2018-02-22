@@ -1,8 +1,14 @@
 #include <iostream>
+#include <cstring>
 
-#define __PLATFORM_MACOSX__ 1
 #ifdef __PLATFORM_MACOSX__
   #include <OpenGL/gl3.h>
+#endif
+#ifdef __PLATFORM_LINUX__
+  // #include <GL/gl.h>
+  // #include <GL/glu.h>
+  // #include <GL/glut.h>
+  #include <glew/include/GL/glew.h>
 #endif
 #include <GLFW/include/glfw3.h>
 
@@ -24,7 +30,7 @@ public:
     matrix[15] = 1.0f;
   }
 
-  Mat4 operator =(const Mat4& other) {
+  void operator =(const Mat4& other) {
     matrix[0]  = other.matrix[0];  matrix[1]  = other.matrix[1];  matrix[2]  = other.matrix[2];  matrix[3]  = other.matrix[3];
     matrix[4]  = other.matrix[4];  matrix[5]  = other.matrix[5];  matrix[6]  = other.matrix[6];  matrix[7]  = other.matrix[7];
     matrix[8]  = other.matrix[8];  matrix[9]  = other.matrix[9];  matrix[10] = other.matrix[10]; matrix[11] = other.matrix[11];
@@ -56,7 +62,7 @@ public:
     return result;
   }
 
-  Mat4 operator *=(const Mat4& other) {
+  void operator *=(const Mat4& other) {
     *this = *this * other;
   }
 
@@ -148,10 +154,16 @@ int main() {
     return 1;
   }
 
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
-  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+  // glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+  // glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+  // glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+  // glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+  #ifdef __PLATFORM_MACOSX__
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+  #endif
 
   GLFWwindow* window = glfwCreateWindow(640, 480, "Window", NULL, NULL);
   if (!window) {
@@ -163,6 +175,8 @@ int main() {
   glfwMakeContextCurrent(window);
   glfwSetKeyCallback(window, KeyCallback);
 
+  glewInit();
+
   // OpenGL stuff
   GLenum error = GL_NO_ERROR;
   printf("GL_NO_ERROR code: %d\n", error);
@@ -170,7 +184,7 @@ int main() {
   GLuint vao;
   glGenVertexArrays(1, &vao);
   glBindVertexArray(vao);
-
+  
   GLuint vertex_buffer_id;
   struct Vertex {
     float x, y, z;
@@ -297,14 +311,12 @@ int main() {
   glUniformMatrix4fv(mvp_location, 1, GL_FALSE, (const GLfloat*)p.matrix);
 
   unsigned int indices[6] = { 3, 0, 1, 1, 2, 3 };
-
   while (!glfwWindowShouldClose(window)) {
     glClear(GL_COLOR_BUFFER_BIT);
 
     glDrawArrays(GL_TRIANGLES, 0, 6);
     //glDrawElements(GL_LINES, 1, GL_UNSIGNED_INT, indices);
     //CheckGLError("glDrawArrays");
-
     glfwSwapBuffers(window);
     glfwPollEvents();
   }
