@@ -1,6 +1,8 @@
 #include <iostream>
 #include <cstring>
 
+#include "chrono.h"
+
 #ifdef __PLATFORM_MACOSX__
   #include <OpenGL/gl3.h>
 #endif
@@ -11,6 +13,8 @@
   #include <glew/include/GL/glew.h>
 #endif
 #include <GLFW/include/glfw3.h>
+
+typedef unsigned char byte;
 
 class Mat4 {
 public:
@@ -93,10 +97,12 @@ static const char* vertex_shader_text =
 
 static const char* fragment_shader_text = 
 "#version 330 core\n"
+"uniform sampler2D target_texture;\n"
 "in vec2 o_uv;\n"
 "out vec4 color;\n"
 "void main() {\n"
-"  color = vec4(o_uv.x, o_uv.y, 0.0, 1.0);\n"
+"  //color = vec4(o_uv.x, o_uv.y, 0.0, 1.0);\n"
+"  color = vec4(texture(target_texture, o_uv).rgb, 1.0);\n"
 "}\n";
 
 // static const char* vertex_shader_text = 
@@ -115,27 +121,27 @@ bool CheckGLError(const char* tag = "") {
   GLenum error = glGetError();
   switch(error) {
     case GL_INVALID_OPERATION: {
-      printf("Invalid operation: %s\n", tag);
+      printf("%s : Invalid operation\n", tag);
       break;
     }
     case GL_INVALID_VALUE: {
-      printf("Invalid value: %s\n", tag);
+      printf("%s : Invalid value\n", tag);
       break;
     }
     case GL_INVALID_ENUM: {
-      printf("Invalid enum: %s\n", tag);
+      printf("%s : Invalid enum\n", tag);
       break;
     }
     case GL_STACK_OVERFLOW: {
-      printf("Stack overflow: %s\n", tag);
+      printf("%s : Stack overflow\n", tag);
       break;
     }
     case GL_STACK_UNDERFLOW: {
-      printf("Stack underflow: %s\n", tag);
+      printf("%s : Stack underflow\n", tag);
       break;
     }
     case GL_OUT_OF_MEMORY: {
-      printf("Out of memory: %s\n", tag);
+      printf("%s : Out of memory\n", tag);
       break;
     }
     // case GL_INVALID_FRAMEBUFFER_OPERATION: {
@@ -173,6 +179,7 @@ int main() {
   }
 
   glfwMakeContextCurrent(window);
+  //glfwSwapInterval(0);
   glfwSetKeyCallback(window, KeyCallback);
 
   glewInit();
@@ -278,12 +285,35 @@ int main() {
   glVertexAttribPointer(uvs_location, 2, GL_FLOAT, GL_FALSE, 0, 0);
   CheckGLError("glVertexAttribPointer 2");
 
+  GLuint texture_id;
+  glGenTextures(1, &texture_id);
+  CheckGLError("glGenTextures");
+  glBindTexture(GL_TEXTURE_2D, texture_id);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);	
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  byte* data = (byte*)malloc(640*480*4);
+  if (!data) {
+  	printf("Error allocating memory\n");
+  }
+  byte* ptr = data;
+  memset(ptr, 0, 640*480*4);
+  // for (unsigned int i = 0; i < 640 * 480; i++) {
+  // 	*ptr = 0xFF;
+  // 	// *(ptr+1) = 0xFF;
+  // 	// *(ptr+2) = 0x00;
+  // 	ptr += 3;
+  // }
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 640, 480, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+
+
   Mat4 m, p, mvp;
   m.setIdentity();
 
-  float right = 1.0f;
-  float left = -1.0f;
-  float top = 1.0f;
+  float right  =  1.0f;
+  float left   = -1.0f;
+  float top    =  1.0f;
   float bottom = -1.0f;
 
   // column-major order
@@ -311,16 +341,42 @@ int main() {
   glUniformMatrix4fv(mvp_location, 1, GL_FALSE, (const GLfloat*)p.matrix);
 
   unsigned int indices[6] = { 0, 1, 2, 3, 4, 5 };
+  byte r = 0;
+  byte g = 64;
+  byte b = 128;
+  Chrono c;
   while (!glfwWindowShouldClose(window)) {
+  	c.start();
     glClear(GL_COLOR_BUFFER_BIT);
+
+    byte* ptr = data;
+	  memset(ptr, 0, 640*480*4);
+	  for (unsigned int i = 0; i < 640 * 480; i++) {
+	  	*ptr = r;
+	  	*(ptr+1) = g;
+	  	*(ptr+2) = b;
+	  	*(ptr+3) = 255;
+	  	ptr += 4;
+	  }
+	  r++; g++; b++;
+	  r %= 255; g %= 255; b %= 255;
+	  glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 
+	  	640, 480, GL_RGBA, GL_UNSIGNED_BYTE, data);
 
     glDrawArrays(GL_TRIANGLES, 0, 6);
     //glDrawElements(GL_LINES, 1, GL_UNSIGNED_INT, indices);
     //CheckGLError("glDrawArrays");
+
+    c.stop();
+    printf("Frame time: %.2f ms\n", c.timeAsMilliseconds());
+
     glfwSwapBuffers(window);
     glfwPollEvents();
   }
 
+  if (data) {
+  	free(data);
+  }
   glfwDestroyWindow(window);
   glfwTerminate();
 
