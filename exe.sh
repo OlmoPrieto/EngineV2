@@ -7,7 +7,8 @@ clear
 
 echo -e "\n${BLUE} -- Compiling $(DATE) --${NC}"
 
-make config=release -j
+#make config=release -j 3
+./compile.sh
 
 echo -e "\n${GREEN} -- Starting execution $(DATE) --${NC}"
 

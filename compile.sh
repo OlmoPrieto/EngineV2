@@ -5,6 +5,6 @@ DATE=$date
 clear
 echo -e "\n${BLUE} -- Starting compilation $(DATE) --${NC}"
 
-make config=release -j
+make config=release -j 3
 
 echo -e "\n${BLUE} -- Compiled $(DATE) --${NC}"

@@ -84,7 +84,7 @@ solution "Engine"
       "Cocoa.framework", "OpenGL.framework", "IOKit.framework", "CoreVideo.framework",
     }
     linkoptions { "-framework Cocoa","-framework QuartzCore", "-framework OpenGL", "-framework OpenAL" }
-    defines { "__PLATFORM_MACOSX", "_GLFW_COCOA", "_GLFW_NSGL", "_GLFW_USE_OPENGL" }
+    defines { "__PLATFORM_MACOSX__", "_GLFW_COCOA", "_GLFW_NSGL", "_GLFW_USE_OPENGL" }
        
     configuration { "linux" }
       files {  -- GLFW
