@@ -93,6 +93,7 @@ public:
    *  Quite costly. Reallocation can happen.
    *
    *  TODO: maybe assert if position >= m_uCount?
+   *  TODO: if position > m_uCount add void elements
   */
   void insert(const T& element, uint32 position)
   {
@@ -169,7 +170,7 @@ public:
     else
     {
       printf("Index out of range in vector\n");
-      return T();
+      std::abort();
     }
   }
 
@@ -217,7 +218,7 @@ public:
   }
 
   /*
-   *  Should implement exception-throwing system
+   *  Should implement exception-throwing system. (no)
   */
   T at(uint32 index) const
   {
@@ -227,7 +228,7 @@ public:
     } else
     {
       printf("Index out of range in vector\n");
-      return T();
+      //return T();
     }
   }
 

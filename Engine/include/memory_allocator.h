@@ -21,6 +21,8 @@ class Allocator {
 private:
   class Block {
   private:
+    friend class Allocator;
+
     Block();
 
     Block* m_pPrevBlock;
@@ -32,7 +34,7 @@ private:
 
   public:
     Block(byte* pAddress, uint64_t uSize, uint64_t uId = 1 << 16, 
-      Block* pPrevBlock, Block* pNextBlock, bool bFree = false);
+      Block* pPrevBlock = nullptr, Block* pNextBlock = nullptr, bool bFree = false);
     ~Block();
 
     inline const byte* getAddress() const;
@@ -52,6 +54,8 @@ private:
 
   class BlockPool {
   private:
+    friend class Allocator;
+
     elm::vector<Block> m_vBlocks;
     Block* m_pBigFreeBlock;
     Block* m_pFirstFreeBlock;
@@ -85,7 +89,7 @@ private:
     void printUsedMemory() const;
     void printNumElements() const;
     void printAllElements() const;
-    void* getBlockAddress() const;
+    void* getBigBlockAddress() const;
     static uint64_t getBlockCount();
   };
 
@@ -117,7 +121,7 @@ public:
   ~mptr();
 
   T* get() const;
-  T* operator ->();
+  T* operator ->() const;
   void release();
 };
 
